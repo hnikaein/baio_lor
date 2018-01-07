@@ -7,11 +7,8 @@
 #include "utils/vector_writer.h"
 #include "utils/heap.h"
 #include <iostream>
-#include <unordered_set>
 #include <cmath>
 #include <boost/format.hpp>
-#include <map>
-
 
 using namespace std;
 
@@ -112,7 +109,7 @@ int tot_res = 0;
 
 auto align_read(const int read_i, const BasketMinHash &similarity_claz, const int gingle_length, const int gap_length) {
     Sequence &read = reads[read_i];
-    int chunk_i = 0;
+    unsigned int chunk_i = 0;
     while (chunk_i < CHUNK_SIZES_LEN and CHUNK_SIZES[chunk_i] < read.size)
         chunk_i += 1;
     if (chunk_i == CHUNK_SIZES_LEN)
@@ -125,8 +122,8 @@ auto align_read(const int read_i, const BasketMinHash &similarity_claz, const in
     // TODO   read.write_to_file("tmp/%04dr.fastq" % read_i);
 
     add_time();
-    auto sketch_read = similarity_claz.get_sketch(read, chunk_size, gingle_length, gap_length);
-    auto sketch_read_reverse = similarity_claz.get_sketch(read.get_reversed(), chunk_size, gingle_length, gap_length);
+    auto sketch_read = similarity_claz.get_sketch(read, chunk_i, gingle_length, gap_length);
+    auto sketch_read_reverse = similarity_claz.get_sketch(read.get_reversed(), chunk_i, gingle_length, gap_length);
 
     add_time();
 //    auto scores = align_read__find_res(chunk_i, sketch_read, sketch_read_reverse);
@@ -168,14 +165,15 @@ auto align_read(const int read_i, const BasketMinHash &similarity_claz, const in
 
 }
 
-auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &similarity_class, const int chunk_i,
+auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &similarity_class, const unsigned int chunk_i,
                      const int gingle_length, const int gap_length, const char *const index_base_file_name = nullptr,
                      const bool write_index = true, bool read_index = true) {
     auto chunk_size = CHUNK_SIZES[chunk_i];
     auto log_chunk = (int) log2(chunk_size);
     auto index_file_name = str(boost::format("%s_%d_%d_%d_%d_%d.gin") %
                                (index_base_file_name == nullptr ? ref_file_name : index_base_file_name) %
-                               similarity_class.sketch_ratio % gingle_length % gap_length % MAX_BASENUMBER % log_chunk);
+                               similarity_class.sketch_ratio % gingle_length % gap_length % LOG_MAX_BASENUMBER %
+                               log_chunk);
     vector<Sequence> genome_chunks;
     add_time();
     tie(genome_chunks, ref_chunk_sequences[chunk_i]) = Sequence::chunkenize_big_sequence(ref_genome, chunk_size);
@@ -189,7 +187,7 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
     if (!read_index) {
         // TODO    p = Pool(THREADS_COUNT);
         for (auto seq:genome_chunks) {
-            ref_sketchs.push_back(similarity_class.get_sketch(seq, chunk_size, gingle_length, gap_length));
+            ref_sketchs.push_back(similarity_class.get_sketch(seq, chunk_i, gingle_length, gap_length));
             if ((ref_sketchs.size() / THREADS_COUNT) % (100 / THREADS_COUNT) == 0)
                 logger.debug("loading reference in chunk size 2^%d: %d records", log_chunk, ref_sketchs.size());
         }
@@ -215,7 +213,7 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
 int main() {
     auto config_str = str(boost::format(
             "sketch ratio:%d, shingle length:%d, gap_length:%d, base_number:%d, chunk begin:%d, chunk end:%d") %
-                          SKETCH_RATIO % GINGLE_LENGTH % GAP_LENGTH % MAX_BASENUMBER % log2(CHUNK_SIZES[0]) %
+                          SKETCH_RATIO % GINGLE_LENGTH % GAP_LENGTH % LOG_MAX_BASENUMBER % log2(CHUNK_SIZES[0]) %
                           log2(CHUNK_SIZES[CHUNK_SIZES_LEN - 1]));
     const char *config = config_str.c_str();
     logger.info("begin with config: %s", config);
@@ -224,7 +222,7 @@ int main() {
     ref_genome = read_from_file(REF_FILE_NAME, FASTA);
     add_time();
     logger.info("loaded reference: %d ms", last_time());
-    for (int chunk_i = 0; chunk_i < CHUNK_SIZES_LEN; chunk_i++)
+    for (unsigned int chunk_i = 0; chunk_i < CHUNK_SIZES_LEN; chunk_i++)
         make_ref_sketch(REF_FILE_NAME, basket_min_hash, chunk_i, GINGLE_LENGTH, 0);
     add_time();
     reads = read_from_file(READS_FILE_NAME, FASTQ);
