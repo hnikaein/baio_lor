@@ -31,8 +31,11 @@ void Heap::inc_element(const int &element) {
 }
 
 pair<int, int> Heap::pop() {
+    if (h.size() == 1)
+        throw;
     auto result = move(h[1]);
     h[1] = move(h[h.size() - 1]);
+    h.pop_back();
     int element = h[1].second;
     index[element] = 1;
     while ((index[element] * 2 + 1 < h.size() && h[index[element]].first < h[index[element] * 2 + 1].first) ||
@@ -47,5 +50,9 @@ pair<int, int> Heap::pop() {
         index[element] = bigger;
     }
     return result;
+}
+
+bool Heap::has_element() {
+    return h.size() > 1;
 }
 

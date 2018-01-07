@@ -16,6 +16,8 @@ public:
 
     std::pair<int, int> pop();
 
+    bool has_element();
+
 private:
     int size;
     std::vector<std::pair<int, int>> h;

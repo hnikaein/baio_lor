@@ -34,7 +34,7 @@ align_read__find_res2(const int chunk_i, const int *sketch_read, const int *sket
         for (int i = 0; i < SKETCH_SIZE; ++i)
             for (int j:ref_hash_sketchs[chunk_i][sketch[i]])
                 scores.inc_element(j);
-        while (true) {
+        while (scores.has_element()) {
             auto p = scores.pop();
             if (p.first < ALT_MATCHS_RATIO * max_score)
                 break;
