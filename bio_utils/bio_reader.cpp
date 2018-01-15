@@ -27,7 +27,7 @@ std::tuple<std::vector<char *>, std::vector<char *>, std::vector<int>> read_fast
     struct stat st{};
     auto file = fopen(file_name, "r");
     if (!file || stat(file_name, &st) != 0)
-        return make_tuple(move(names), move(seqs), move(lens));
+        throw "fasta file not found or not readable";
 
     auto result = new char[st.st_size];
     bool name_state = true;
@@ -75,7 +75,7 @@ read_fastq(const char *const file_name) {
         return make_tuple(move(names), move(seqs), move(lens), move(quality));
     struct stat st{};
     if (stat(file_name, &st) != 0)
-        return make_tuple(move(names), move(seqs), move(lens), move(quality));
+        throw "fastq file not found or not readable";
 
     auto result = new char[st.st_size];
 

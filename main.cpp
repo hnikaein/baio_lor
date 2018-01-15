@@ -9,6 +9,7 @@
 #include <iostream>
 #include <cmath>
 #include <boost/format.hpp>
+#include <cstring>
 
 using namespace std;
 
@@ -167,7 +168,7 @@ auto align_read(const int read_i, const BasketMinHash &similarity_claz, const in
 
 auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &similarity_class, const unsigned int chunk_i,
                      const int gingle_length, const int gap_length, const char *const index_base_file_name = nullptr,
-                     const bool write_index = true, bool read_index = true) {
+                     const bool write_index = WRITE_INDEX, bool read_index = READ_INDEX) {
     auto chunk_size = CHUNK_SIZES[chunk_i];
     auto log_chunk = (int) log2(chunk_size);
     auto index_file_name = str(boost::format("%s_%d_%d_%d_%d_%d.gin") %
@@ -194,12 +195,21 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
     }
     add_time();
     vector<int> *ref_hash_sketch = ref_hash_sketchs[chunk_i];
-    for (int i = 0; i < ref_sketchs.size(); ++i)
-        for (int j = 0; j < SKETCH_SIZE; ++j)
-//            if (ref_sketchs[i][j] > BIG_PRIME_NUMBER)
-//                cout << "salam";
-//            else
-            ref_hash_sketch[ref_sketchs[i][j]].push_back(i);
+    for (int i = 0; i < ref_sketchs.size(); ++i) {
+        ref_hash_sketch[ref_sketchs[i][0]].push_back(i);
+        for (int j = 1; j < SKETCH_SIZE; ++j)
+            if (ref_sketchs[i][j] != ref_sketchs[i][j - 1])
+                ref_hash_sketch[ref_sketchs[i][j]].push_back(i);
+    }
+//    int hist[101] = {};
+//    for (int i = 0; i <= BIG_PRIME_NUMBER; ++i)
+//        if (ref_hash_sketch[i].size() < 100)
+//            hist[ref_hash_sketch[i].size()]++;
+//        else
+//            hist[100]++;
+//    for (int i : hist)
+//        printf("%d ", i);
+//    printf("\n");
     add_time();
 
     if (!read_index && write_index)
@@ -210,7 +220,23 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
 }
 
 
-int main() {
+int main(int argsc, char *argv[]) {
+    for (int i = 0; i < argsc; ++i) {
+        char *key = argv[i];
+        char *value = nullptr;
+        for (int j = 0; argv[i][j] > 0; ++j)
+            if (argv[i][j] == '=') {
+                argv[i][j] = 0;
+                value = argv[i] + j + 1;
+                break;
+            }
+        if (!strcmp(key, "--ref"))
+            REF_FILE_NAME = value;
+        if (!strcmp(key, "--reads"))
+            READS_FILE_NAME = value;
+        if (!strcmp(key, "--alt-match-ratio"))
+            ALT_MATCHS_RATIO = stod(value);
+    }
     auto config_str = str(boost::format(
             "sketch ratio:%d, shingle length:%d, gap_length:%d, base_number:%d, chunk begin:%d, chunk end:%d") %
                           SKETCH_RATIO % GINGLE_LENGTH % GAP_LENGTH % LOG_MAX_BASENUMBER % log2(CHUNK_SIZES[0]) %
