@@ -15,8 +15,9 @@ using namespace std;
 
 vector<int *> ref_chunk_sketchs[CHUNK_SIZES_LEN];
 vector<Sequence> ref_chunk_sequences[CHUNK_SIZES_LEN], reads, ref_genome;
-Logger logger(Logger::DEBUG);
+Logger *logger;
 vector<int> ref_hash_sketchs[CHUNK_SIZES_LEN][BIG_PRIME_NUMBER + 1];
+double alt_matchs_ratio = ALT_MATCHS_RATIO_DEFAULT;
 
 int vector_equal_counts(const int *a, const int *b, int size) {
     int equality = 0;
@@ -37,7 +38,7 @@ align_read__find_res2(const int chunk_i, const int *sketch_read, const int *sket
                 scores.inc_element(j);
         while (scores.has_element()) {
             auto p = scores.pop();
-            if (p.first < ALT_MATCHS_RATIO * max_score)
+            if (p.first < alt_matchs_ratio * max_score)
                 break;
             temp_result.push_back(p);
             if (p.first > max_score)
@@ -48,7 +49,7 @@ align_read__find_res2(const int chunk_i, const int *sketch_read, const int *sket
 //         [](const pair<int, int> &a, const pair<int, int> &b) { return a.first > b.first; });
 //    int i;
 //    for (i = 1; i < temp_result.size(); ++i)
-//        if (temp_result[i].first < ALT_MATCHS_RATIO * temp_result[0].first)
+//        if (temp_result[i].first < alt_matchs_ratio * temp_result[0].first)
 //            break;
 //    temp_result.erase(temp_result.begin() + i, temp_result.end());
 //    return temp_result;
@@ -58,7 +59,7 @@ align_read__find_res2(const int chunk_i, const int *sketch_read, const int *sket
     int first_score = temp_result[temp_result_size - 1].first;
     int i;
     for (i = static_cast<int>(temp_result_size - 2); i >= 0; --i)
-        if (temp_result[i].first < ALT_MATCHS_RATIO * first_score)
+        if (temp_result[i].first < alt_matchs_ratio * first_score)
             break;
     auto result = vector<pair<int, int>>(temp_result_size - i - 1);
     for (int k = i + 1; k < temp_result_size; ++k)
@@ -76,7 +77,7 @@ auto align_read__find_res(const int chunk_i, const int *sketch_read, const int *
         for (int sketch_sim: {vector_equal_counts(ref_sketchs[i], sketch_read, SKETCH_SIZE),
                               vector_equal_counts(ref_sketchs[i], sketch_read_reverse, SKETCH_SIZE)}) {
             count += sketch_sim;
-            if (sketch_sim <= max_sim[MAX_ALT_MATCHS - 1] || sketch_sim <= ALT_MATCHS_RATIO * max_sim[0])
+            if (sketch_sim <= max_sim[MAX_ALT_MATCHS - 1] || sketch_sim <= alt_matchs_ratio * max_sim[0])
                 continue;
             for (int j = 0; j < last_match_i; j++) {
                 if (sketch_sim >= max_sim[j]) {
@@ -97,10 +98,10 @@ auto align_read__find_res(const int chunk_i, const int *sketch_read, const int *
             }
         }
     }
-    logger.info("%d", count);
+    logger->info("%d", count);
     auto result = vector<pair<int, int>>();
     for (int i = last_match_i - 1; i >= 0; i--)
-        if (max_sim[i] >= ALT_MATCHS_RATIO * max_sim[0])
+        if (max_sim[i] >= alt_matchs_ratio * max_sim[0])
             result.emplace_back(max_sim[i], max_sim_i[i]);
 
     return result;
@@ -145,7 +146,7 @@ auto align_read(const int read_i, const BasketMinHash &similarity_claz, const in
 
         results.insert(max_simm_i);
 
-        logger.debugl2("our result: read:%04d num:%d score:%d index:%d name:%s", read_i, results.size(), max_simm,
+        logger->debugl2("our result: read:%04d num:%d score:%d index:%d name:%s", read_i, results.size(), max_simm,
                        max_simm_i, ref_chunk_sequences[chunk_i][max_simm_i].get_name_c());
 
         if ((max_simm_i - 1) * int(chunk_size) / 2 <= read_begin &&
@@ -158,8 +159,8 @@ auto align_read(const int read_i, const BasketMinHash &similarity_claz, const in
     // TODO run_aryana(read_i);
 
     add_time();
-    logger.debugl2("Read name: %s", read.get_name_c());
-    logger.debug("our result: read:%04d\t%04d\t%d\t%d\t%d\t%d\t%s", read_i, correct_index, correct_score, read_len,
+    logger->debugl2("Read name: %s", read.get_name_c());
+    logger->debug("our result: read:%04d\t%04d\t%d\t%d\t%d\t%d\t%s", read_i, correct_index, correct_score, read_len,
                  int(log2(CHUNK_SIZES[chunk_i])), CHUNK_SIZES[chunk_i], get_times_str(true));
     tot_res += results.size();
     return correct_index > -1; // TODO return times
@@ -172,9 +173,8 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
     auto chunk_size = CHUNK_SIZES[chunk_i];
     auto log_chunk = (int) log2(chunk_size);
     auto index_file_name = str(boost::format("%s_%d_%d_%d_%d_%d.gin") %
-                               (index_base_file_name == nullptr ? ref_file_name : index_base_file_name) %
-                               similarity_class.sketch_ratio % gingle_length % gap_length % LOG_MAX_BASENUMBER %
-                               log_chunk);
+                               (index_base_file_name == nullptr ? ref_file_name : index_base_file_name) % SKETCH_SIZE %
+                               gingle_length % gap_length % LOG_MAX_BASENUMBER % log_chunk);
     vector<Sequence> genome_chunks;
     add_time();
     tie(genome_chunks, ref_chunk_sequences[chunk_i]) = Sequence::chunkenize_big_sequence(ref_genome, chunk_size);
@@ -190,7 +190,7 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
         for (auto seq:genome_chunks) {
             ref_sketchs.push_back(similarity_class.get_sketch(seq, chunk_i, gingle_length, gap_length));
             if ((ref_sketchs.size() / THREADS_COUNT) % (100 / THREADS_COUNT) == 0)
-                logger.debug("loading reference in chunk size 2^%d: %d records", log_chunk, ref_sketchs.size());
+                logger->debug("loading reference in chunk size 2^%d: %d records", log_chunk, ref_sketchs.size());
         }
     }
     add_time();
@@ -215,12 +215,15 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
     if (!read_index && write_index)
         write_to_file(index_file_name.c_str(), ref_chunk_sketchs[chunk_i], SKETCH_SIZE);
     add_time();
-    logger.info("loaded reference sketch/names in chunk size 2^%d: %sms: %d records",
+    logger->info("loaded reference sketch/names in chunk size 2^%d: %sms: %d records",
                 log_chunk, get_times_str(true), ref_chunk_sequences[chunk_i].size());
 }
 
 
 int main(int argsc, char *argv[]) {
+    auto *ref_file_name = const_cast<char *>(REF_FILE_NAME_DEFAULT);
+    auto *reads_file_name = const_cast<char *>(READS_FILE_NAME_DEFAULT);
+    int log_level = Logger::DEBUG;
     for (int i = 0; i < argsc; ++i) {
         char *key = argv[i];
         char *value = nullptr;
@@ -231,36 +234,39 @@ int main(int argsc, char *argv[]) {
                 break;
             }
         if (!strcmp(key, "--ref"))
-            REF_FILE_NAME = value;
+            ref_file_name = value;
         if (!strcmp(key, "--reads"))
-            READS_FILE_NAME = value;
+            reads_file_name = value;
         if (!strcmp(key, "--alt-match-ratio"))
-            ALT_MATCHS_RATIO = stod(value);
+            alt_matchs_ratio = stod(value);
+        if (!strcmp(key, "--log"))
+            log_level = stoi(value);
     }
+    logger = new Logger(log_level);
     auto config_str = str(boost::format(
-            "sketch ratio:%d, shingle length:%d, gap_length:%d, base_number:%d, chunk begin:%d, chunk end:%d") %
-                          SKETCH_RATIO % GINGLE_LENGTH % GAP_LENGTH % LOG_MAX_BASENUMBER % log2(CHUNK_SIZES[0]) %
+            "shingle length:%d, gap_length:%d, base_number:%d, chunk begin:%d, chunk end:%d") %
+                          GINGLE_LENGTH % GAP_LENGTH % LOG_MAX_BASENUMBER % log2(CHUNK_SIZES[0]) %
                           log2(CHUNK_SIZES[CHUNK_SIZES_LEN - 1]));
     const char *config = config_str.c_str();
-    logger.info("begin with config: %s", config);
-    auto basket_min_hash = BasketMinHash(SKETCH_RATIO, 1, zigma_hash, BIG_PRIME_NUMBER);
+    logger->info("begin with config: %s", config);
+    auto basket_min_hash = BasketMinHash(1, zigma_hash, BIG_PRIME_NUMBER);
     add_time();
-    ref_genome = read_from_file(REF_FILE_NAME, FASTA);
+    ref_genome = read_from_file(ref_file_name, FASTA);
     add_time();
-    logger.info("loaded reference: %d ms", last_time());
+    logger->info("loaded reference: %d ms", last_time());
     for (unsigned int chunk_i = 0; chunk_i < CHUNK_SIZES_LEN; chunk_i++)
-        make_ref_sketch(REF_FILE_NAME, basket_min_hash, chunk_i, GINGLE_LENGTH, 0);
+        make_ref_sketch(ref_file_name, basket_min_hash, chunk_i, GINGLE_LENGTH, 0);
     add_time();
-    reads = read_from_file(READS_FILE_NAME, FASTQ);
+    reads = read_from_file(reads_file_name, FASTQ);
     add_time();
-    logger.info("load reads time: %d ms", last_time());
+    logger->info("load reads time: %d ms", last_time());
     int corrects = 0;
     auto reads_size = static_cast<int>(reads.size());
     for (int i = 0; i < reads_size; i++)
         corrects += align_read(i, basket_min_hash, GINGLE_LENGTH, GAP_LENGTH);
     add_time();
-    logger.info("total results:%d", tot_res);
-    logger.info("correct reads for config(%s): %d\nmaking sam files", config, corrects);
-    logger.info("total times %s", get_times_str(true));
+    logger->info("total results:%d", tot_res);
+    logger->info("correct reads for config(%s): %d\nmaking sam files", config, corrects);
+    logger->info("total times %s", get_times_str(true));
     return 0;
 }

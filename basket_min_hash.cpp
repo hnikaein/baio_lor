@@ -3,10 +3,8 @@
 
 using namespace std;
 
-BasketMinHash::BasketMinHash(const int sketch_ratio, const int sketch_window, const hash_function_t hash_function,
-                             const int max_hash_function) : sketch_ratio(sketch_ratio), sketch_window(sketch_window),
-                                                            hash_function(hash_function),
-                                                            max_hash_function(max_hash_function) {}
+BasketMinHash::BasketMinHash(const int sketch_window, const hash_function_t hash_function, const int max_hash_function)
+        : sketch_window(sketch_window), hash_function(hash_function), max_hash_function(max_hash_function) {}
 
 int *BasketMinHash::get_sketch(const Sequence &sequence, const unsigned int chunk_i, const int gingle_length,
                                const int gingle_gap) const {

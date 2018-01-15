@@ -31,7 +31,7 @@ std::tuple<std::vector<char *>, std::vector<char *>, std::vector<int>> read_fast
 
     auto result = new char[st.st_size];
     bool name_state = true;
-    int result_i = 0, last_result_i = 0;
+    long result_i = 0, last_result_i = 0;
     char buffer[BUFSIZ], last_ch, ch = '\0';
     size_t read_len;
 
@@ -46,7 +46,7 @@ std::tuple<std::vector<char *>, std::vector<char *>, std::vector<int>> read_fast
                 result[result_i++] = '\0';
                 name_state = true;
                 names.push_back(result + result_i);
-                lens.push_back(result_i - last_result_i - 1);
+                lens.push_back(static_cast<int &&>(result_i - last_result_i - 1));
                 continue;
             } else if (ch == '\n' || ch == '\r') {
                 if (last_ch != '\n' && last_ch != '\r' && name_state) {
@@ -61,7 +61,7 @@ std::tuple<std::vector<char *>, std::vector<char *>, std::vector<int>> read_fast
         }
     }
     result[result_i++] = '\0';
-    lens.push_back(result_i - last_result_i);
+    lens.push_back(static_cast<int &&>(result_i - last_result_i));
     fclose(file);
     return make_tuple(move(names), move(seqs), move(lens));
 }
