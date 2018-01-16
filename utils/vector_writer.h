@@ -3,8 +3,8 @@
 #ifndef C_LONG_READ_ALIGNER_VECTOR_WRITER_H
 #define C_LONG_READ_ALIGNER_VECTOR_WRITER_H
 
-void write_to_file(char const *file_name, const std::vector<int *> &data, int row_size);
+void write_to_file(char const *file_name, const std::vector<int> *data, int size);
 
-std::vector<int *> read_from_file(char const *file_name);
+std::vector<int> *read_from_file(char const *file_name);
 
 #endif //C_LONG_READ_ALIGNER_VECTOR_WRITER_H
