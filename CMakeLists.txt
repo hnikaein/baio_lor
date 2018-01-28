@@ -3,6 +3,7 @@ project(c_long_read_aligner)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "-O2")
+set(CMAKE_CXX_FLAGS "-fopenmp")
 #set(CMAKE_CXX_FLAGS "-Wall")
 #set(CMAKE_CXX_FLAGS "-mcmodel=medium")
 

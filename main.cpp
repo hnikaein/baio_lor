@@ -10,6 +10,7 @@
 #include <cmath>
 #include <boost/format.hpp>
 #include <cstring>
+#include <omp.h>
 
 using namespace std;
 
@@ -148,21 +149,29 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
             ref_genome = read_from_file(ref_file_name, FASTA);
         add_time();
         logger->info("loaded reference: %d ms", last_time());
+
         vector<Sequence> genome_chunks = Sequence::chunkenize_big_sequence(ref_genome, chunk_size);
         vector<int> *ref_hash_sketch = ref_hash_sketchs[chunk_i] = new vector<int>[BIG_PRIME_NUMBER + 2];
-        // TODO    p = Pool(THREADS_COUNT);
-        for (int i = 0; i < genome_chunks.size(); ++i) {
+        auto genome_chunks_size = static_cast<int>(genome_chunks.size());
+
+        for (int i = 0; i < genome_chunks_size; ++i)
             if (!strncmp(genome_chunks[i].get_name().c_str(), "00000000", 8))
                 ref_hash_sketch[BIG_PRIME_NUMBER + 1].push_back(i);
+#pragma omp parallel for
+        for (int i = 0; i < genome_chunks_size; ++i) {
             int *sketch = similarity_class.get_sketch(genome_chunks[i], chunk_i, gingle_length, gap_length);
-            ref_hash_sketch[sketch[0]].push_back(i);
-            for (int j = 1; j < SKETCH_SIZE; ++j)
-                if (sketch[j] != sketch[j - 1])
-                    ref_hash_sketch[sketch[j]].push_back(i);
+#pragma omp critical
+            {
+                ref_hash_sketch[sketch[0]].push_back(i);
+                for (int j = 1; j < SKETCH_SIZE; ++j)
+                    if (sketch[j] != sketch[j - 1])
+                        ref_hash_sketch[sketch[j]].push_back(i);
+            }
+            delete sketch;
             if ((i / THREADS_COUNT) % (1000 / THREADS_COUNT) == 0)
                 logger->debug("loading reference in chunk size 2^%d: %d records", log_chunk, i);
         }
-        ref_hash_sketch[BIG_PRIME_NUMBER + 1].push_back(static_cast<int>(genome_chunks.size()));
+        ref_hash_sketch[BIG_PRIME_NUMBER + 1].push_back(static_cast<int>(genome_chunks_size));
     }
     // BIG_PRIME_NUMBER + 1 for genome_parts_starts and last one for ref_chunk_size[chunk_i]
     genome_parts_starts[chunk_i] = ref_hash_sketchs[chunk_i][BIG_PRIME_NUMBER + 1];
