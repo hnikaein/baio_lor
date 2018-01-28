@@ -21,19 +21,20 @@ void write_to_file(const char *const file_name, const vector<int> *data, const i
                 additional_zeros = 0;
             }
         last_data_size = data_size;
-        if (write_size + data_size < MYBUFSIZE) {
+        if (write_size + data_size >= MYBUFSIZE) {
+            fwrite(buffer, static_cast<size_t>(write_size), sizeof(int), file);
+            write_size = 0;
+            if (data_size >= MYBUFSIZE) {
+                fwrite(&data_size, static_cast<size_t>(1), sizeof(int), file);
+                fwrite(&data[i][0], static_cast<size_t>(data_size), sizeof(int), file);
+            }
+        }
+        if (data_size < MYBUFSIZE) {
             memcpy(buffer + (write_size++), &data_size, sizeof(int));
             if (data_size) {
                 memcpy(buffer + write_size, &data[i][0], data_size * sizeof(int));
                 write_size += data_size;
             }
-        } else if (write_size == 0) {
-            fwrite(&data_size, static_cast<size_t>(1), sizeof(int), file);
-            fwrite(&data[i][0], static_cast<size_t>(data_size), sizeof(int), file);
-        } else {
-            fwrite(buffer, static_cast<size_t>(write_size), sizeof(int), file);
-            write_size = 0;
-            i--;
         }
     }
     fwrite(buffer, static_cast<size_t>(write_size), sizeof(int), file);

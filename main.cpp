@@ -13,17 +13,19 @@
 
 using namespace std;
 
-vector<Sequence> ref_chunk_sequences[CHUNK_SIZES_LEN], reads, ref_genome;
+//vector<Sequence> ref_chunk_sequences[CHUNK_SIZES_LEN];
+vector<Sequence> reads, ref_genome;
 Logger *logger;
 vector<int> *ref_hash_sketchs[CHUNK_SIZES_LEN];
 double alt_matchs_ratio = ALT_MATCHS_RATIO_DEFAULT;
+vector<int> genome_parts_starts[CHUNK_SIZES_LEN];
 
 vector<pair<int, int>>
 align_read__find_res2(const int chunk_i, const int *sketch_read, const int *sketch_read_reverse) {
     auto temp_result = vector<pair<int, int>>();
     int max_score = 0;
     for (auto sketch:{sketch_read, sketch_read_reverse}) {
-        auto scores = Heap(static_cast<int>(ref_chunk_sequences[chunk_i].size()));
+        auto scores = Heap(genome_parts_starts[chunk_i].back());
         for (int i = 0; i < SKETCH_SIZE; ++i)
             for (int j:ref_hash_sketchs[chunk_i][sketch[i]])
                 scores.inc_element(j);
@@ -47,16 +49,18 @@ align_read__find_res2(const int chunk_i, const int *sketch_read, const int *sket
     sort(temp_result.begin(), temp_result.end(),
          [](const pair<int, int> &a, const pair<int, int> &b) { return a.first < b.first; });
     unsigned long temp_result_size = temp_result.size();
-    int first_score = temp_result[temp_result_size - 1].first;
-    int i;
-    for (i = static_cast<int>(temp_result_size - 2); i >= 0; --i)
-        if (temp_result[i].first < alt_matchs_ratio * first_score)
-            break;
-    auto result = vector<pair<int, int>>(temp_result_size - i - 1);
-    for (int k = i + 1; k < temp_result_size; ++k)
-        result[k - i - 1] = move(temp_result[k]);
-    return result;
-
+    if (temp_result_size > 0) {
+        int first_score = temp_result[temp_result_size - 1].first;
+        int i;
+        for (i = static_cast<int>(temp_result_size - 2); i >= 0; --i)
+            if (temp_result[i].first < alt_matchs_ratio * first_score)
+                break;
+        auto result = vector<pair<int, int>>(temp_result_size - i - 1);
+        for (int k = i + 1; k < temp_result_size; ++k)
+            result[k - i - 1] = move(temp_result[k]);
+        return result;
+    } else
+        return vector<pair<int, int>>();
 }
 
 int tot_res = 0;
@@ -92,15 +96,19 @@ auto align_read(const int read_i, const BasketMinHash &similarity_claz, const in
         auto te = scores.back();
         scores.pop_back();
         int max_simm = te.first, max_simm_i = te.second;
-        if (results.count(max_simm_i + 1) || results.count(max_simm_i - 1))
-            continue;
+        // if (results.count(max_simm_i + 1) || results.count(max_simm_i - 1))
+        //    continue;
         // TODO ref_chunk_sequences[chunk_i][max_simm_i].write_to_file("tmp/%04dg.fasta" % read_i,append=True if i else False)
 
         results.insert(max_simm_i);
 
-        logger->debugl2("our result: read:%04d num:%d score:%d index:%d name:%s", read_i, results.size(), max_simm,
-                        max_simm_i, ref_chunk_sequences[chunk_i][max_simm_i].get_name_c());
+        logger->debugl2("our result: read:%04d num:%d score:%d index:%d", read_i, results.size(), max_simm, max_simm_i);
 
+        for (int i = 0; i < genome_parts_starts[chunk_i].size() - 1; ++i)
+            if (max_simm_i >= genome_parts_starts[chunk_i][i] && max_simm_i < genome_parts_starts[chunk_i][i + 1]) {
+                max_simm_i -= genome_parts_starts[chunk_i][i];
+                break;
+            }
         if ((max_simm_i - 1) * int(chunk_size) / 2 <= read_begin &&
             read_begin + read_len <= (max_simm_i + 3) * chunk_size / 2) {
             correct_index = max_simm_i;
@@ -127,45 +135,44 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
     auto index_file_name = str(boost::format("%s_%d_%d_%d_%d_%d.gin") %
                                (index_base_file_name == nullptr ? ref_file_name : index_base_file_name) % SKETCH_SIZE %
                                gingle_length % gap_length % LOG_MAX_BASENUMBER % log_chunk);
-    vector<Sequence> genome_chunks;
-    add_time();
-    tie(genome_chunks, ref_chunk_sequences[chunk_i]) = Sequence::chunkenize_big_sequence(ref_genome, chunk_size);
     add_time();
     if (read_index)
         try {
             ref_hash_sketchs[chunk_i] = read_from_file(index_file_name.c_str());
+            logger->info("chunk %d read completed", chunk_i);
         } catch (...) {
             read_index = false;
         }
     if (!read_index) {
-        vector<int> *ref_hash_sketch = ref_hash_sketchs[chunk_i] = new vector<int>[BIG_PRIME_NUMBER + 1];
+        if (ref_genome.empty())
+            ref_genome = read_from_file(ref_file_name, FASTA);
+        add_time();
+        logger->info("loaded reference: %d ms", last_time());
+        vector<Sequence> genome_chunks = Sequence::chunkenize_big_sequence(ref_genome, chunk_size);
+        vector<int> *ref_hash_sketch = ref_hash_sketchs[chunk_i] = new vector<int>[BIG_PRIME_NUMBER + 2];
         // TODO    p = Pool(THREADS_COUNT);
         for (int i = 0; i < genome_chunks.size(); ++i) {
+            if (!strncmp(genome_chunks[i].get_name().c_str(), "00000000", 8))
+                ref_hash_sketch[BIG_PRIME_NUMBER + 1].push_back(i);
             int *sketch = similarity_class.get_sketch(genome_chunks[i], chunk_i, gingle_length, gap_length);
             ref_hash_sketch[sketch[0]].push_back(i);
             for (int j = 1; j < SKETCH_SIZE; ++j)
                 if (sketch[j] != sketch[j - 1])
                     ref_hash_sketch[sketch[j]].push_back(i);
-            if ((i / THREADS_COUNT) % (100 / THREADS_COUNT) == 0)
+            if ((i / THREADS_COUNT) % (1000 / THREADS_COUNT) == 0)
                 logger->debug("loading reference in chunk size 2^%d: %d records", log_chunk, i);
         }
+        ref_hash_sketch[BIG_PRIME_NUMBER + 1].push_back(static_cast<int>(genome_chunks.size()));
     }
-//    int hist[101] = {};
-//    for (int i = 0; i <= BIG_PRIME_NUMBER; ++i)
-//        if (ref_hash_sketch[i].size() < 100)
-//            hist[ref_hash_sketch[i].size()]++;
-//        else
-//            hist[100]++;
-//    for (int i : hist)
-//        printf("%d ", i);
-//    printf("\n");
+    // BIG_PRIME_NUMBER + 1 for genome_parts_starts and last one for ref_chunk_size[chunk_i]
+    genome_parts_starts[chunk_i] = ref_hash_sketchs[chunk_i][BIG_PRIME_NUMBER + 1];
     add_time();
 
     if (!read_index && write_index)
-        write_to_file(index_file_name.c_str(), ref_hash_sketchs[chunk_i], BIG_PRIME_NUMBER + 1);
+        write_to_file(index_file_name.c_str(), ref_hash_sketchs[chunk_i], BIG_PRIME_NUMBER + 2);
     add_time();
-    logger->info("loaded reference sketch/names in chunk size 2^%d: %sms: %d records",
-                 log_chunk, get_times_str(true), ref_chunk_sequences[chunk_i].size());
+    logger->info("loaded reference sketch/names in chunk size 2^%d: %sms: %d records", log_chunk, get_times_str(true),
+                 genome_parts_starts[chunk_i].back());
 }
 
 
@@ -200,9 +207,6 @@ int main(int argsc, char *argv[]) {
     logger->info("begin with config: %s", config);
     auto basket_min_hash = BasketMinHash(1, zigma_hash, BIG_PRIME_NUMBER);
     add_time();
-    ref_genome = read_from_file(ref_file_name, FASTA);
-    add_time();
-    logger->info("loaded reference: %d ms", last_time());
     for (unsigned int chunk_i = 0; chunk_i < CHUNK_SIZES_LEN; chunk_i++)
         make_ref_sketch(ref_file_name, basket_min_hash, chunk_i, GINGLE_LENGTH, 0);
     add_time();
