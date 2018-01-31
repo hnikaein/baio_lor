@@ -16,7 +16,6 @@ void add_time_c(const string &caller_name) {
     ));
 }
 
-
 string get_times_str_c(const string &caller_name, bool free_space) {
     string res;
     for (int i = 1; i < times[caller_name].size(); i++)

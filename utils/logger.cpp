@@ -54,11 +54,13 @@ void Logger::fatal(const char *const format, ...) {
 void Logger::log(const string &s, LogLevel log_level) {
     if (log_level > this->log_level)
         return;
-    mtx.lock();
     time_t ctt = time(nullptr);
     char *time = asctime(localtime(&ctt));
     time[strlen(time) - 1] = '\0';
-    cout << time << ": " << s << endl;
+    const char *s_c_str = s.c_str();
+    mtx.lock();
+    printf("%s: %s\n", time, s_c_str);
+//    cout << time << ": " << s << endl;
     mtx.unlock();
 }
 

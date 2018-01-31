@@ -19,6 +19,8 @@ public:
 
     Sequence get_reversed();
 
+    void write_to_file(const char *file_name, bool append = false);
+
     const char *const seq_str;
     unsigned long size;
 private:
