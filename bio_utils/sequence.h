@@ -20,7 +20,7 @@ public:
 
     Sequence get_reversed();
 
-    void write_to_file(const char *file_name, bool append = false, bool force_write = true);
+    int write_to_file(const char *file_name, bool append = false, bool force_write = true);
 
     const char *const seq_str;
     unsigned long size;

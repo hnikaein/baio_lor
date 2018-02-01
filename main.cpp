@@ -11,6 +11,8 @@
 #include <cstring>
 #include <algorithm>
 #include <iostream>
+#include <sys/stat.h>
+#include "aryana/main.h"
 
 using namespace std;
 
@@ -22,6 +24,7 @@ double alt_matchs_ratio = ALT_MATCHS_RATIO_DEFAULT;
 vector<int> genome_parts_starts[CHUNK_SIZES_LEN];
 BasketMinHash *similarity_claz;
 map<int, vector<int>> total_results;
+
 
 string vector_str(int *vec, unsigned long size) {
     string s;
@@ -114,6 +117,7 @@ int align_read(const int read_i) {
     int correct_chunk_index = -1, correct_score = -1, correct_rank = -1;
     auto results = unordered_set<int>();
     auto results_score = vector<int>();
+    int chunk_ratio = CHUNK_SIZES[chunk_i] / CHUNK_SIZES[CHUNK_SIZES_LEN - 1];
     while (!scores.empty() && results.size() < MAX_ALT_MATCHS) {
         auto te = scores.back();
         scores.pop_back();
@@ -123,7 +127,7 @@ int align_read(const int read_i) {
 
         results.insert(max_simm_i);
         results_score.push_back(max_simm);
-        total_results[read_i].push_back(max_simm_i);
+        total_results[read_i].push_back(max_simm_i / chunk_ratio);
         logger->debugl2("our result: read:%04d num:%d score:%d index:%d", read_i, results.size(), max_simm, max_simm_i);
 
         // check is correct or not
@@ -214,11 +218,20 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
         tie(genome_chunks, genome_double_chunks, ref_hash_sketch[BIG_PRIME_NUMBER + 1]) =
                 Sequence::chunkenize_big_sequence(ref_genome, chunk_size, chunk_i == CHUNK_SIZES_LEN - 1);
         auto ref_file_base_name = string(ref_file_name).substr(string(ref_file_name).find('/') + 1).c_str();
-        if (chunk_i == CHUNK_SIZES_LEN - 1)
-            for (int i = 0; i < genome_double_chunks.size(); ++i)
-                genome_double_chunks[i].write_to_file(
-                        Logger::formatString("%s/%s_%d_%d.fasta", CHUNKS_FOLDER_NAME, ref_file_base_name, log_chunk,
-                                             i).c_str(), false, false);
+        if (chunk_i == CHUNK_SIZES_LEN - 1) {
+            mkdir(CHUNKS_FOLDER_NAME, 0777);
+            for (int i = 0; i < genome_double_chunks.size(); ++i) {
+                auto file_name_str = Logger::formatString("%s/%s_%d_%d.fasta", CHUNKS_FOLDER_NAME, ref_file_base_name,
+                                                          log_chunk, i);
+                char *file_name = strdup(file_name_str.c_str());
+                if (!genome_double_chunks[i].write_to_file(file_name, false, false)) {
+                    char *argv[] = {const_cast<char *>("index"), file_name};
+                    bwa_index(2, argv);
+                    argv[0] = const_cast<char *>("fa2bin");
+                    fa2bin(2, argv);
+                }
+            }
+        }
         add_time();
         multiproc(THREADS_COUNT, make_ref_sketch__skethize, static_cast<int>(genome_chunks.size()));
     }

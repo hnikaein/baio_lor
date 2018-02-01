@@ -67,11 +67,11 @@ const char *Sequence::get_name_c() {
     return name;
 }
 
-void Sequence::write_to_file(const char *file_name, const bool append, const bool force_write) {
+int Sequence::write_to_file(const char *file_name, const bool append, const bool force_write) {
     if (!force_write) {
         struct stat st{};
         if (stat(file_name, &st) == 0)
-            return;
+            return 1;
     }
     auto file = fopen(file_name, append ? "a" : "w");
     char tempch = '>', endlch = '\n';
@@ -81,6 +81,7 @@ void Sequence::write_to_file(const char *file_name, const bool append, const boo
     fwrite(seq_str, static_cast<size_t>(size), sizeof(char), file);
     fwrite(&endlch, static_cast<size_t>(1), sizeof(char), file);
     fclose(file);
+    return 0;
 }
 
 
