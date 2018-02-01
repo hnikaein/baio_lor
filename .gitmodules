@@ -1,0 +1,3 @@
+[submodule "aryana"]
+	path = aryana
+	url = ../aryana/
