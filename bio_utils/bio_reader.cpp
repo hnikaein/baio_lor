@@ -60,7 +60,7 @@ std::tuple<std::vector<char *>, std::vector<char *>, std::vector<int>> read_fast
             result[result_i++] = name_state ? ch : static_cast<char>(toupper(ch));
         }
     }
-    result[result_i++] = '\0';
+    result[result_i] = '\0';
     lens.push_back(static_cast<int &&>(result_i - last_result_i));
     fclose(file);
     return make_tuple(move(names), move(seqs), move(lens));

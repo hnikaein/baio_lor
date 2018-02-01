@@ -1,4 +1,5 @@
 #include "multiproc.h"
+#include <pthread.h>
 
 int last_unruned, result_count;
 pthread_mutex_t mutex1, mutex2;

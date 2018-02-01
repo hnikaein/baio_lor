@@ -19,6 +19,7 @@ const unsigned int SKETCH_SIZES[] = {1 << 7, 1 << 8, 1 << 9, 1 << 10};
 #define REF_FILE_NAME_DEFAULT       BASE_FILE_NAME ".fasta"
 #define READS_FILE_NAME_DEFAULT     BASE_FILE_NAME ".reads.fastq"
 #define BASE_FILE_NAME              "seqs/ecoli"
+#define CHUNKS_FOLDER_NAME          "chunks"
 
 #define array_len(x)                ((sizeof(x)) / (sizeof((x)[0])))
 #define CHUNK_SIZES_LEN             array_len(CHUNK_SIZES)

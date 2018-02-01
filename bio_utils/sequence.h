@@ -7,7 +7,8 @@
 
 class Sequence {
 public:
-    static std::vector<Sequence> chunkenize_big_sequence(const std::vector<Sequence> &seqs, unsigned int chunk_size);
+    static std::tuple<std::vector<Sequence>, std::vector<Sequence>, std::vector<int>>
+    chunkenize_big_sequence(const std::vector<Sequence> &seqs, unsigned int chunk_size, bool double_needed = false);
 
     Sequence(const char *seq_str, unsigned long seq_str_len, const char *name = "", const char *quality_str = "");
 
@@ -19,7 +20,7 @@ public:
 
     Sequence get_reversed();
 
-    void write_to_file(const char *file_name, bool append = false);
+    void write_to_file(const char *file_name, bool append = false, bool force_write = true);
 
     const char *const seq_str;
     unsigned long size;

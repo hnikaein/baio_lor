@@ -21,14 +21,37 @@ vector<int> *ref_hash_sketchs[CHUNK_SIZES_LEN];
 double alt_matchs_ratio = ALT_MATCHS_RATIO_DEFAULT;
 vector<int> genome_parts_starts[CHUNK_SIZES_LEN];
 BasketMinHash *similarity_claz;
+map<int, vector<int>> total_results;
 
-string sketch_str(int *sketch, int size) {
+string vector_str(int *vec, unsigned long size) {
     string s;
     for (int i = 0; i < size; ++i) {
         s += ",";
-        s += to_string(sketch[i]);
+        s += to_string(vec[i]);
     }
     return s;
+}
+
+void write_results(const char *ref_file_name, const char *reads_file_name) {
+    char endlch = '\n';
+    auto log_chunk = static_cast<int>(log2(CHUNK_SIZES[CHUNK_SIZES_LEN - 1]));
+
+    auto ref_file_base_name = string(ref_file_name).substr(string(ref_file_name).find('/') + 1).c_str();
+    auto chunks_address = Logger::formatString("%s/%s_%d_%%d.fasta", CHUNKS_FOLDER_NAME, ref_file_base_name, log_chunk);
+
+    auto reads_file_base_name = string(reads_file_name).substr(string(reads_file_name).find('/') + 1);
+    auto file = fopen(Logger::formatString("%s.lra", reads_file_base_name.c_str()).c_str(), "w");
+
+    fwrite(chunks_address.c_str(), static_cast<size_t>(chunks_address.size()), sizeof(char), file);
+    fwrite(&endlch, static_cast<size_t>(1), sizeof(char), file);
+    fwrite(reads_file_name, static_cast<size_t>(strlen(reads_file_name)), sizeof(char), file);
+    fwrite(&endlch, static_cast<size_t>(1), sizeof(char), file);
+    for (int i = 0; i < reads.size(); ++i) {
+        string line = vector_str(total_results[i].data(), total_results[i].size());
+        fwrite(line.c_str() + 1, static_cast<size_t>(line.size() - 1), sizeof(char), file);
+        fwrite(&endlch, static_cast<size_t>(1), sizeof(char), file);
+    }
+    fclose(file);
 }
 
 vector<pair<int, int>>
@@ -100,6 +123,7 @@ int align_read(const int read_i) {
 
         results.insert(max_simm_i);
         results_score.push_back(max_simm);
+        total_results[read_i].push_back(max_simm_i);
         logger->debugl2("our result: read:%04d num:%d score:%d index:%d", read_i, results.size(), max_simm, max_simm_i);
 
         // check is correct or not
@@ -134,15 +158,10 @@ int make_ref_sketch__skethize(const int i) {
     auto chunk_i = sketchize_chunk_i;
     vector<int> *ref_hash_sketch = ref_hash_sketchs[chunk_i];
     int *sketch = similarity_claz->get_sketch(genome_chunks[i], chunk_i, GINGLE_LENGTH, 0);
-//    if (i == 90864) {
-//        printf(sketch_str(sketch, SKETCH_SIZE).c_str());
-//        printf("\n");
-//        char buffer[32001];
-//        strncpy(buffer, genome_chunks[i].seq_str, 32000);
-//        buffer[32000] = 0;
-//        printf(buffer);
-//        printf("\n");
-//    }
+
+    // if (i == 90864) { printf(sketch_str(sketch, SKETCH_SIZE).c_str()); printf("\n"); char buffer[32001];
+    // strncpy(buffer, genome_chunks[i].seq_str, 32000); buffer[32000] = 0; printf(buffer); printf("\n"); }
+
     pthread_mutex_lock(&sketchize_mutex[sketch[0]]);
     ref_hash_sketch[sketch[0]].push_back(i);
     pthread_mutex_unlock(&sketchize_mutex[sketch[0]]);
@@ -170,7 +189,7 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
 
     auto index_file_name =
             Logger::formatString("%s_%d_%d_%d_%d_%d.gin",
-                                 (index_base_file_name == nullptr ? ref_file_name : index_base_file_name), SKETCH_SIZE,
+                                 index_base_file_name == nullptr ? ref_file_name : index_base_file_name, SKETCH_SIZE,
                                  gingle_length, gap_length, LOG_MAX_BASENUMBER, log_chunk);
     add_time();
     if (read_index)
@@ -186,21 +205,22 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
             add_time();
             logger->info("loaded reference: %d ms", last_time());
 
-//            char buffer[1001];
-//            strncpy(buffer, ref_genome[343].seq_str + 7106518, 1000);
-//            buffer[1001] = 0;
-//            printf(buffer);
-//            printf("\n");
+            // char buffer[1001]; strncpy(buffer, ref_genome[343].seq_str + 7106518, 1000); buffer[1001] = 0;
+            // printf(buffer);printf("\n");
         }
-        genome_chunks = Sequence::chunkenize_big_sequence(ref_genome, chunk_size);
         vector<int> *ref_hash_sketch = ref_hash_sketchs[chunk_i] = new vector<int>[BIG_PRIME_NUMBER + 2];
-        auto genome_chunks_size = static_cast<int>(genome_chunks.size());
 
-        for (int i = 0; i < genome_chunks_size; ++i)
-            if (!strncmp(genome_chunks[i].get_name().c_str(), "00000000", 8))
-                ref_hash_sketch[BIG_PRIME_NUMBER + 1].push_back(i);
-        multiproc(THREADS_COUNT, make_ref_sketch__skethize, genome_chunks_size);
-        ref_hash_sketch[BIG_PRIME_NUMBER + 1].push_back(genome_chunks_size);
+        vector<Sequence> genome_double_chunks;
+        tie(genome_chunks, genome_double_chunks, ref_hash_sketch[BIG_PRIME_NUMBER + 1]) =
+                Sequence::chunkenize_big_sequence(ref_genome, chunk_size, chunk_i == CHUNK_SIZES_LEN - 1);
+        auto ref_file_base_name = string(ref_file_name).substr(string(ref_file_name).find('/') + 1).c_str();
+        if (chunk_i == CHUNK_SIZES_LEN - 1)
+            for (int i = 0; i < genome_double_chunks.size(); ++i)
+                genome_double_chunks[i].write_to_file(
+                        Logger::formatString("%s/%s_%d_%d.fasta", CHUNKS_FOLDER_NAME, ref_file_base_name, log_chunk,
+                                             i).c_str(), false, false);
+        add_time();
+        multiproc(THREADS_COUNT, make_ref_sketch__skethize, static_cast<int>(genome_chunks.size()));
     }
     // BIG_PRIME_NUMBER + 1 for genome_parts_starts and last one for ref_chunk_size[chunk_i]
     genome_parts_starts[chunk_i] = ref_hash_sketchs[chunk_i][BIG_PRIME_NUMBER + 1];
@@ -218,7 +238,7 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
 int main(int argsc, char *argv[]) {
     auto *ref_file_name = const_cast<char *>(REF_FILE_NAME_DEFAULT);
     auto *reads_file_name = const_cast<char *>(READS_FILE_NAME_DEFAULT);
-    int log_level = Logger::DEBUG;
+    int log_level = Logger::INFO;
     bool read_index = READ_INDEX, write_index = WRITE_INDEX;
     for (int i = 0; i < argsc; ++i) {
         char *key = argv[i];
@@ -258,12 +278,15 @@ int main(int argsc, char *argv[]) {
 
     reads = read_from_file(reads_file_name, FASTQ);
     add_time();
-
     logger->info("load reads time: %d ms", last_time());
+
+    for (int i = 0; i < reads.size(); ++i)
+        total_results[i] = vector<int>();
     int corrects = multiproc(THREADS_COUNT, align_read, static_cast<int>(reads.size()));
     add_time();
-
     logger->info("total results:%d", tot_res);
+
+    write_results(ref_file_name, reads_file_name);
     logger->info("correct reads for config(%s): %d\nmaking sam files", config, corrects);
     logger->info("total times %s", get_times_str(true));
     return 0;
