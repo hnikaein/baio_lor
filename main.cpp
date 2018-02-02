@@ -42,7 +42,7 @@ void write_results(const char *ref_file_base_name, const char *reads_file_name) 
 
     auto chunks_address = Logger::formatString("%s/%s_%d_%%d.fasta", CHUNKS_FOLDER_NAME, ref_file_base_name, log_chunk);
 
-    auto file = fopen(Logger::formatString("%s.lra", strstr(reads_file_name, "/") + 1).c_str(), "w");
+    auto file = fopen((string(reads_file_name) + ".lra").c_str(), "w");
 
     fwrite(chunks_address.c_str(), static_cast<size_t>(chunks_address.size()), sizeof(char), file);
     fwrite(&endlch, static_cast<size_t>(1), sizeof(char), file);

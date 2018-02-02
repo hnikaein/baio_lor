@@ -83,10 +83,14 @@ int run_aryana_for_ref(const int ref_num) {
     getline(res, first_header);
     string line;
     getline(res, line);
+    line = line.substr(7, line.find("LN:") - 8);
+    size_t sz;
+    int offset = max((stoi(line) - 1) * stoi(line.substr(9), &sz) / 2, 0);
+    line = "@SQ\tSN:" + line.substr(10 + sz);
     headers.insert(line);
     while (getline(res, line)) {
         size_t pos = 0, prev_pos = 0;
-        int j = 0, offset = 0;
+        int j = 0;
         string token, new_line, name;
         while ((pos = line.find('\t', pos + 1)) != string::npos) {
             token = line.substr(prev_pos, pos - prev_pos);
@@ -94,11 +98,8 @@ int run_aryana_for_ref(const int ref_num) {
                 name = token;
             if (j == 1 && reads_ref_id.count(name))
                 token = to_string(stoi(token) + 256);
-            if (j == 2) {
-                size_t sz;
-                offset = max((stoi(token) - 1) * stoi(token.substr(9), &sz) / 2, 0);
+            if (j == 2)
                 token = token.substr(10 + sz);
-            }
             if (j == 3)
                 token = to_string(stoi(token) + offset);
             new_line.append(token);
