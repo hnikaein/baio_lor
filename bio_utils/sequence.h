@@ -22,10 +22,10 @@ public:
 
     int write_to_file(const char *file_name, bool append = false, bool force_write = true);
 
-    const char *const seq_str;
+    const char *const seq_str, *quality_str;
     unsigned long size;
 private:
-    const char *name, *quality_str;
+    const char *name;
 };
 
 #endif //SEQUENCE_H

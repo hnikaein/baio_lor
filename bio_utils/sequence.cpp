@@ -83,6 +83,3 @@ int Sequence::write_to_file(const char *file_name, const bool append, const bool
     fclose(file);
     return 0;
 }
-
-
-

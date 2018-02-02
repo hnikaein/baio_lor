@@ -13,6 +13,7 @@
 #include <iostream>
 #include <sys/stat.h>
 #include "aryana/main.h"
+#include "aryana_helper.h"
 
 using namespace std;
 
@@ -24,26 +25,24 @@ double alt_matchs_ratio = ALT_MATCHS_RATIO_DEFAULT;
 vector<int> genome_parts_starts[CHUNK_SIZES_LEN];
 BasketMinHash *similarity_claz;
 map<int, vector<int>> total_results;
-
+char *ref_file_base_name;
 
 string vector_str(int *vec, unsigned long size) {
     string s;
     for (int i = 0; i < size; ++i) {
-        s += ",";
-        s += to_string(vec[i]);
+        s.append(",");
+        s.append(to_string(vec[i]));
     }
     return s;
 }
 
-void write_results(const char *ref_file_name, const char *reads_file_name) {
+void write_results(const char *ref_file_base_name, const char *reads_file_name) {
     char endlch = '\n';
     auto log_chunk = static_cast<int>(log2(CHUNK_SIZES[CHUNK_SIZES_LEN - 1]));
 
-    auto ref_file_base_name = string(ref_file_name).substr(string(ref_file_name).find('/') + 1).c_str();
     auto chunks_address = Logger::formatString("%s/%s_%d_%%d.fasta", CHUNKS_FOLDER_NAME, ref_file_base_name, log_chunk);
 
-    auto reads_file_base_name = string(reads_file_name).substr(string(reads_file_name).find('/') + 1);
-    auto file = fopen(Logger::formatString("%s.lra", reads_file_base_name.c_str()).c_str(), "w");
+    auto file = fopen(Logger::formatString("%s.lra", strstr(reads_file_name, "/") + 1).c_str(), "w");
 
     fwrite(chunks_address.c_str(), static_cast<size_t>(chunks_address.size()), sizeof(char), file);
     fwrite(&endlch, static_cast<size_t>(1), sizeof(char), file);
@@ -111,13 +110,12 @@ int align_read(const int read_i) {
     delete sketch_read;
     delete sketch_read_reverse;
 
-    const string &read_name = read.get_name();
-    int read_begin = stoi(read_name.substr(read_name.find("startpos=") + 9, read_name.find("_number")));
-    int read_len = stoi(read_name.substr(read_name.find("length=") + 7, read_name.find("bp_")));
+    int read_begin = stoi(strstr(read.get_name_c(), "startpos=") + 9);
+    int read_len = stoi(strstr(read.get_name_c(), "length=") + 7);
     int correct_chunk_index = -1, correct_score = -1, correct_rank = -1;
     auto results = unordered_set<int>();
     auto results_score = vector<int>();
-    int chunk_ratio = CHUNK_SIZES[chunk_i] / CHUNK_SIZES[CHUNK_SIZES_LEN - 1];
+    int chunk_ratio = CHUNK_SIZES[CHUNK_SIZES_LEN - 1] / CHUNK_SIZES[chunk_i];
     while (!scores.empty() && results.size() < MAX_ALT_MATCHS) {
         auto te = scores.back();
         scores.pop_back();
@@ -217,7 +215,6 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
         vector<Sequence> genome_double_chunks;
         tie(genome_chunks, genome_double_chunks, ref_hash_sketch[BIG_PRIME_NUMBER + 1]) =
                 Sequence::chunkenize_big_sequence(ref_genome, chunk_size, chunk_i == CHUNK_SIZES_LEN - 1);
-        auto ref_file_base_name = string(ref_file_name).substr(string(ref_file_name).find('/') + 1).c_str();
         if (chunk_i == CHUNK_SIZES_LEN - 1) {
             mkdir(CHUNKS_FOLDER_NAME, 0777);
             for (int i = 0; i < genome_double_chunks.size(); ++i) {
@@ -275,6 +272,7 @@ int main(int argsc, char *argv[]) {
         if (!strcmp(key, "--write-index"))
             write_index = strcmp(value, "false") != 0;
     }
+    ref_file_base_name = strstr(ref_file_name, "/") + 1;
     logger = new Logger(log_level);
 
     auto config_str = Logger::formatString(
@@ -299,8 +297,9 @@ int main(int argsc, char *argv[]) {
     add_time();
     logger->info("total results:%d", tot_res);
 
-    write_results(ref_file_name, reads_file_name);
+    write_results(ref_file_base_name, reads_file_name);
     logger->info("correct reads for config(%s): %d\nmaking sam files", config, corrects);
+    run_aryana(ref_file_base_name, reads, total_results);
     logger->info("total times %s", get_times_str(true));
     return 0;
 }
