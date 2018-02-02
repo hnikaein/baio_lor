@@ -299,7 +299,7 @@ int main(int argsc, char *argv[]) {
 
     write_results(ref_file_base_name, reads_file_name);
     logger->info("correct reads for config(%s): %d\nmaking sam files", config, corrects);
-    run_aryana(ref_file_base_name, reads, total_results);
+    run_aryana(ref_file_base_name, reads_file_name, reads, total_results);
     logger->info("total times %s", get_times_str(true));
     return 0;
 }

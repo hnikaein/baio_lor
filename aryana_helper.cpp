@@ -38,7 +38,7 @@ int run_aryana_for_ref(const int ref_num) {
         reads_string.append(read->quality_str);
         reads_string.append("\n");
         if (read_num.second > 0)
-                reads_ref_id[read->get_name()] = read_num.second;
+            reads_ref_id[read->get_name()] = read_num.second;
     }
 
     int p[2];
@@ -112,7 +112,8 @@ int run_aryana_for_ref(const int ref_num) {
     }
 }
 
-void run_aryana(const char *ref_file_base_name, vector<Sequence> &reads, map<int, vector<int>> &results) {
+void run_aryana(const char *ref_file_base_name, const char *reads_file_name, vector<Sequence> &reads,
+                map<int, vector<int>> &results) {
     aryana_helper_ref_file_base_name = ref_file_base_name;
     for (int i = 0; i < reads.size(); ++i)
         for (int j = 0; j < results[i].size(); j++) {
@@ -127,10 +128,10 @@ void run_aryana(const char *ref_file_base_name, vector<Sequence> &reads, map<int
         run_aryana_for_ref(p.first);
     }
 //    multiproc(THREADS_COUNT, run_aryana_for_ref, static_cast<int>(reads.size()));
-    ofstream result_file("arayana.sam");
+    ofstream result_file((string(reads_file_name) + ".sam").c_str());
     result_file << first_header << endl;
     for (const auto &header :headers)
-       result_file << header << endl;
+        result_file << header << endl;
     sort(result_lines.begin(), result_lines.end());
     for (const auto &result_line: result_lines)
         result_file << result_line << endl;
