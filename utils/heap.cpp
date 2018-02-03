@@ -10,7 +10,7 @@ Heap::Heap(int size) : size(size) {
 Heap::~Heap() {
     h.clear();
     indexx.clear();
-    delete index;
+    delete[] index;
 }
 
 

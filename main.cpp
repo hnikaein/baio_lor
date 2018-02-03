@@ -30,7 +30,7 @@ unsigned int log_chunk;
 extern Logger *logger;
 
 
-int create_aryana_indexes(int part) {
+int create_aryana_indexes(const int part) {
     auto file_name_str = Logger::formatString("%s/%s_%d_%d.fasta", CHUNKS_FOLDER_NAME, ref_file_base_name,
                                               log_chunk, part);
     char *file_name = strdup(file_name_str.c_str());
@@ -40,6 +40,7 @@ int create_aryana_indexes(int part) {
         argv[0] = const_cast<char *>("fa2bin");
         fa2bin(2, argv);
     }
+    free(file_name);
 }
 
 string vector_str(int *vec, unsigned long size) {
@@ -122,8 +123,8 @@ int align_read(const int read_i) {
     auto sketch_read = similarity_claz->get_sketch(read, chunk_i, GINGLE_LENGTH, GAP_LENGTH);
     auto sketch_read_reverse = similarity_claz->get_sketch(read.get_reversed(), chunk_i, GINGLE_LENGTH, GAP_LENGTH);
     auto scores = align_read__find_res(chunk_i, sketch_read, sketch_read_reverse);
-    delete sketch_read;
-    delete sketch_read_reverse;
+    delete[] sketch_read;
+    delete[] sketch_read_reverse;
 
     int read_begin = stoi(strstr(read.get_name_c(), "startpos=") + 9);
     int read_len = stoi(strstr(read.get_name_c(), "length=") + 7);
@@ -189,7 +190,7 @@ int make_ref_sketch__skethize(const int i) {
             pthread_mutex_unlock(&sketchize_mutex[sketch[j]]);
         }
 
-    delete sketch;
+    delete[] sketch;
     if ((i / THREADS_COUNT) % (1000 / THREADS_COUNT) == 0)
         logger->debug("loading reference in chunk size 2^%d: %d records", log_chunk, i);
     return 0;
@@ -246,6 +247,8 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
     logger->info("loaded reference sketch/names in chunk size 2^%d: %sms: %d records", log_chunk, get_times_str(true),
                  genome_parts_starts[chunk_i].back());
     genome_chunks.clear();
+    if (chunk_i == CHUNK_SIZES_LEN - 1 && !read_index)
+        delete[] ref_genome[0].get_name_c();
 }
 
 
@@ -305,5 +308,6 @@ int main(int argsc, char *argv[]) {
     logger->info("correct reads for config(%s): %d\nmaking sam files", config, corrects);
     run_aryana(ref_file_base_name, reads_file_name, reads, total_results);
     logger->info("total times %s", get_times_str(true));
+    delete[] (reads[0].get_name_c() - 1);
     return 0;
 }

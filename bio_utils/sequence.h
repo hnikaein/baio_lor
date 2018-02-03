@@ -12,7 +12,7 @@ public:
 
     Sequence(const char *seq_str, unsigned long seq_str_len, const char *name = "", const char *quality_str = "");
 
-    Sequence(const std::string &seq_str);
+    Sequence(Sequence &&sequence) noexcept;
 
     std::string get_name();
 
@@ -22,8 +22,11 @@ public:
 
     int write_to_file(const char *file_name, bool append = false, bool force_write = true);
 
-    const char *const seq_str, *quality_str;
+    ~Sequence();
+
+    const char *seq_str, *quality_str;
     unsigned long size;
+    int delete_flag = 0b000;
 private:
     const char *name;
 };

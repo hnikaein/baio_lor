@@ -36,9 +36,9 @@ int run_aryana_for_ref(const int ref_num) {
         reads_string.append("@");
         reads_string.append(read->get_name_c());
         reads_string.append("\n");
-        reads_string.append(read->seq_str);
+        reads_string.append(read->seq_str, 0, 15000);
         reads_string.append("\n+\n");
-        reads_string.append(read->quality_str);
+        reads_string.append(read->quality_str, 0, 15000);
         reads_string.append("\n");
         if (read_num.second > 0)
             reads_ref_id[read->get_name()] = read_num.second;
@@ -84,6 +84,7 @@ int run_aryana_for_ref(const int ref_num) {
     bwa_aln_core2(&args);
     close(p[0]);
     stdout = tmp_stdout;
+    free(args.reference);
     logger->debug("end of aryana for ref_num: %d", ref_num);
 
     if (!buffer[0]) {

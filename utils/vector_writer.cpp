@@ -62,6 +62,6 @@ vector<int> *read_from_file(char const *file_name) {
             buffer_p += vec_size;
         }
     }
-    delete all_file;
+    delete[] all_file;
     return result;
 }
