@@ -8,9 +8,11 @@
 #include "aryana_helper.h"
 #include "configs.h"
 #include "utils/logger.h"
+#include <fcntl.h>
 
 long long total_candidates = 0, best_factor_candidates = 0;
 
+extern Logger *logger;
 using namespace std;
 const char *aryana_helper_ref_file_base_name;
 map<int, vector<pair<int, int>>> aryana_helper_results;
@@ -21,6 +23,7 @@ string first_header;
 
 
 int run_aryana_for_ref(const int ref_num) {
+    logger->debug("begin of run_aryana for ref_num: %d", ref_num);
     auto log_chunk = static_cast<int>(log2(CHUNK_SIZES[CHUNK_SIZES_LEN - 1]));
     map<string, int> reads_ref_id;
 
@@ -43,14 +46,14 @@ int run_aryana_for_ref(const int ref_num) {
 
     int p[2];
     pipe(p);
+    fcntl(p[1], F_SETPIPE_SZ, reads_string.size() + 100);
     write(p[1], (void *) reads_string.c_str(), reads_string.size());
     close(p[1]);
     stdin = fdopen(p[0], "rb");
 
     unsigned long buf_size = (reads_string.size() + 500 * aryana_helper_results[ref_num].size()) * 3 / 2;
-    char buffer[buf_size];
+    char buffer[buf_size] = {};
     FILE *tmp_stdout = stdout;
-    stdout = fmemopen(buffer, buf_size, "wb");
 
     aryana_args args{};
     args.discordant = 1;
@@ -76,9 +79,18 @@ int run_aryana_for_ref(const int ref_num) {
     args.read_file = const_cast<char *>("-");
     args.single = 1;
     args.paired = 0;
+    logger->debug("begin of aryana for ref_num: %d", ref_num);
+    stdout = fmemopen(buffer, buf_size, "wb");
     bwa_aln_core2(&args);
-
+    close(p[0]);
     stdout = tmp_stdout;
+    logger->debug("end of aryana for ref_num: %d", ref_num);
+
+    if (!buffer[0]) {
+        logger->info("aryana have no result for ref_num: %d and result count: %d", ref_num,
+                     aryana_helper_results[ref_num].size());
+        return 0;
+    }
     istringstream res(buffer);
     getline(res, first_header);
     string line;
@@ -111,6 +123,7 @@ int run_aryana_for_ref(const int ref_num) {
         new_line.append(token);
         result_lines.push_back(new_line);
     }
+    return 0;
 }
 
 void run_aryana(const char *ref_file_base_name, const char *reads_file_name, vector<Sequence> &reads,
@@ -124,10 +137,8 @@ void run_aryana(const char *ref_file_base_name, const char *reads_file_name, vec
             aryana_helper_results[num_ref].emplace_back(i, j);
         }
     aryana_helper_reads = &reads;
-    for (const auto &p: aryana_helper_results) {
-        printf("%d\n", p.first);
+    for (const auto &p: aryana_helper_results)
         run_aryana_for_ref(p.first);
-    }
 //    multiproc(THREADS_COUNT, run_aryana_for_ref, static_cast<int>(reads.size()));
     ofstream result_file((string(reads_file_name) + ".arayana.sam").c_str());
     result_file << first_header << endl;

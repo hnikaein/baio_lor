@@ -5,6 +5,8 @@
 
 using namespace std;
 
+Logger *logger;
+
 Logger::Logger(int log_level) : log_level(static_cast<LogLevel>(log_level)) {}
 
 void Logger::debugl2(const char *format, ...) {

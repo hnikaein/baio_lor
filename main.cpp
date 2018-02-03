@@ -19,7 +19,6 @@ using namespace std;
 
 //vector<Sequence> ref_chunk_sequences[CHUNK_SIZES_LEN];
 vector<Sequence> reads, ref_genome;
-Logger *logger;
 vector<int> *ref_hash_sketchs[CHUNK_SIZES_LEN];
 double alt_matchs_ratio = ALT_MATCHS_RATIO_DEFAULT;
 vector<int> genome_parts_starts[CHUNK_SIZES_LEN];
@@ -28,6 +27,8 @@ map<int, vector<int>> total_results;
 char *ref_file_base_name;
 vector<Sequence> genome_double_chunks;
 unsigned int log_chunk;
+extern Logger *logger;
+
 
 int create_aryana_indexes(int part) {
     auto file_name_str = Logger::formatString("%s/%s_%d_%d.fasta", CHUNKS_FOLDER_NAME, ref_file_base_name,
@@ -251,7 +252,7 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
 int main(int argsc, char *argv[]) {
     auto *ref_file_name = const_cast<char *>(REF_FILE_NAME_DEFAULT);
     auto *reads_file_name = const_cast<char *>(READS_FILE_NAME_DEFAULT);
-    int log_level = Logger::INFO;
+    int log_level = Logger::DEBUG;
     bool read_index = READ_INDEX, write_index = WRITE_INDEX;
     for (int i = 0; i < argsc; ++i) {
         char *key = argv[i];
