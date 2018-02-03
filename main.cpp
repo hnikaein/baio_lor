@@ -26,6 +26,20 @@ vector<int> genome_parts_starts[CHUNK_SIZES_LEN];
 BasketMinHash *similarity_claz;
 map<int, vector<int>> total_results;
 char *ref_file_base_name;
+vector<Sequence> genome_double_chunks;
+unsigned int log_chunk;
+
+int create_aryana_indexes(int part) {
+    auto file_name_str = Logger::formatString("%s/%s_%d_%d.fasta", CHUNKS_FOLDER_NAME, ref_file_base_name,
+                                              log_chunk, part);
+    char *file_name = strdup(file_name_str.c_str());
+    if (!genome_double_chunks[part].write_to_file(file_name, false, false)) {
+        char *argv[] = {const_cast<char *>("index"), file_name};
+        bwa_index(2, argv);
+        argv[0] = const_cast<char *>("fa2bin");
+        fa2bin(2, argv);
+    }
+}
 
 string vector_str(int *vec, unsigned long size) {
     string s;
@@ -152,7 +166,7 @@ int align_read(const int read_i) {
 }
 
 
-unsigned int log_chunk, sketchize_chunk_i;
+unsigned int sketchize_chunk_i;
 vector<Sequence> genome_chunks;
 pthread_mutex_t sketchize_mutex[BIG_PRIME_NUMBER + 1];
 
@@ -212,22 +226,11 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
         }
         vector<int> *ref_hash_sketch = ref_hash_sketchs[chunk_i] = new vector<int>[BIG_PRIME_NUMBER + 2];
 
-        vector<Sequence> genome_double_chunks;
         tie(genome_chunks, genome_double_chunks, ref_hash_sketch[BIG_PRIME_NUMBER + 1]) =
                 Sequence::chunkenize_big_sequence(ref_genome, chunk_size, chunk_i == CHUNK_SIZES_LEN - 1);
         if (chunk_i == CHUNK_SIZES_LEN - 1) {
             mkdir(CHUNKS_FOLDER_NAME, 0777);
-            for (int i = 0; i < genome_double_chunks.size(); ++i) {
-                auto file_name_str = Logger::formatString("%s/%s_%d_%d.fasta", CHUNKS_FOLDER_NAME, ref_file_base_name,
-                                                          log_chunk, i);
-                char *file_name = strdup(file_name_str.c_str());
-                if (!genome_double_chunks[i].write_to_file(file_name, false, false)) {
-                    char *argv[] = {const_cast<char *>("index"), file_name};
-                    bwa_index(2, argv);
-                    argv[0] = const_cast<char *>("fa2bin");
-                    fa2bin(2, argv);
-                }
-            }
+            multiproc(THREADS_COUNT, create_aryana_indexes, static_cast<int>(genome_double_chunks.size()));
         }
         add_time();
         multiproc(THREADS_COUNT, make_ref_sketch__skethize, static_cast<int>(genome_chunks.size()));

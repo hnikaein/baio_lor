@@ -129,7 +129,7 @@ void run_aryana(const char *ref_file_base_name, const char *reads_file_name, vec
         run_aryana_for_ref(p.first);
     }
 //    multiproc(THREADS_COUNT, run_aryana_for_ref, static_cast<int>(reads.size()));
-    ofstream result_file((string(reads_file_name) + ".sam").c_str());
+    ofstream result_file((string(reads_file_name) + ".arayana.sam").c_str());
     result_file << first_header << endl;
     for (const auto &header :headers)
         result_file << header << endl;
@@ -138,3 +138,4 @@ void run_aryana(const char *ref_file_base_name, const char *reads_file_name, vec
         result_file << result_line << endl;
     result_file.close();
 }
+

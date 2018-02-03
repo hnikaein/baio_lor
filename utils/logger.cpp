@@ -65,6 +65,7 @@ void Logger::log(const string &s, LogLevel log_level) {
 
 string Logger::formatString(const char *const format, va_list args) {
     char buffer[FORMAT_LENGTH];
+    buffer[0] = 0;
     vsnprintf(buffer, FORMAT_LENGTH, format, args);
     return string(buffer);
 }
