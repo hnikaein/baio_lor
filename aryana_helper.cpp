@@ -54,13 +54,14 @@ int run_aryana_for_ref(const int ref_num) {
 //    fwrite(reads_string.c_str(), sizeof(char), reads_string.size(), f);
 //    fclose(f);
 
-    unsigned long buf_size = (reads_string.size() + 500 * aryana_helper_results[ref_num].size()) * 3 / 2;
+    int reads_size = static_cast<int>(aryana_helper_results[ref_num].size());
+    unsigned long buf_size = (reads_string.size() + 500 * reads_size) * 3 / 2;
     char buffer[buf_size] = {};
     FILE *tmp_stdout = stdout;
 
     aryana_args args{};
     args.discordant = 1;
-    args.threads = THREADS_COUNT;
+    args.threads = min(THREADS_COUNT, reads_size);
     args.potents = 10;
     args.debug = 0;
     args.seed_length = 8; // XXX changed
@@ -92,8 +93,7 @@ int run_aryana_for_ref(const int ref_num) {
     logger->debug("end of aryana for ref_num: %d", ref_num);
 
     if (!buffer[0]) {
-        logger->info("aryana have no result for ref_num: %d and result count: %d", ref_num,
-                     aryana_helper_results[ref_num].size());
+        logger->info("aryana have no result for ref_num: %d and result count: %d", ref_num, reads_size);
         return 0;
     }
     istringstream res(buffer);

@@ -150,16 +150,16 @@ int align_read(const int read_i) {
 
         results.insert(max_simm_i);
         results_score.push_back(max_simm);
-        total_results[read_i].push_back(max_simm_i / chunk_ratio);
         logger->debugl2("our result: read:%04d num:%d score:%d index:%d", read_i, results.size(), max_simm, max_simm_i);
+        for (int i = 0; i < genome_parts_starts[chunk_i].size() - 1; ++i)
+            if (max_simm_i >= genome_parts_starts[chunk_i][i] && max_simm_i < genome_parts_starts[chunk_i][i + 1]) {
+                max_simm_i -= genome_parts_starts[chunk_i][i];
+                total_results[read_i].push_back(max_simm_i / chunk_ratio + genome_parts_starts[CHUNK_SIZES_LEN - 1][i]);
+                break;
+            }
 
         // check is correct or not
         if (correct_score == -1) {
-            for (int i = 0; i < genome_parts_starts[chunk_i].size() - 1; ++i)
-                if (max_simm_i >= genome_parts_starts[chunk_i][i] && max_simm_i < genome_parts_starts[chunk_i][i + 1]) {
-                    max_simm_i -= genome_parts_starts[chunk_i][i];
-                    break;
-                }
             if ((max_simm_i - 1) * int(chunk_size) / 2 <= read_begin &&
                 read_begin + read_len <= (max_simm_i + 3) * chunk_size / 2) {
                 correct_rank = static_cast<int>(results.size());
