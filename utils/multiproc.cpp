@@ -23,6 +23,7 @@ void *consumer_thread(void *end) {
 }
 
 int multiproc(int thread_count, int (*start_routine1)(const int), int end, int from) {
+    result_count = 0;
     last_unruned = from;
     pthread_t thread[thread_count];
     start_routine = start_routine1;

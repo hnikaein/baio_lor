@@ -41,6 +41,7 @@ int create_aryana_indexes(const int part) {
         fa2bin(2, argv);
     }
     free(file_name);
+    return 0;
 }
 
 string vector_str(int *vec, unsigned long size) {
@@ -121,7 +122,15 @@ int align_read(const int read_i) {
     const unsigned int chunk_size = CHUNK_SIZES[chunk_i];
 
     auto sketch_read = similarity_claz->get_sketch(read, chunk_i, GINGLE_LENGTH, GAP_LENGTH);
+    if (sketch_read[0] == -1) {
+        logger->info("removing read %d", read_i);
+        return 0;
+    }
     auto sketch_read_reverse = similarity_claz->get_sketch(read.get_reversed(), chunk_i, GINGLE_LENGTH, GAP_LENGTH);
+    if (sketch_read_reverse[0] == -1) {
+        logger->info("removing read %d", read_i);
+        return 0;
+    }
     auto scores = align_read__find_res(chunk_i, sketch_read, sketch_read_reverse);
     delete[] sketch_read;
     delete[] sketch_read_reverse;
@@ -162,7 +171,8 @@ int align_read(const int read_i) {
     logger->debugl2("Read name: %s", read.get_name_c());
     int alt_score = correct_rank == 1 ? (results_score.size() > 1 ? results_score[1] : -1) : results_score[0];
     logger->debug("our result: read:%04d\t%04d\t%d\t%03d\t%03d\t%03d\t%d\t%d", read_i, correct_chunk_index,
-                  correct_rank, correct_score, alt_score, read_len, log2(CHUNK_SIZES[chunk_i]), CHUNK_SIZES[chunk_i]);
+                  correct_rank, correct_score, alt_score, read_len, int(log2(CHUNK_SIZES[chunk_i])),
+                  CHUNK_SIZES[chunk_i]);
     tot_res += results.size();
     return correct_chunk_index > -1;
 }
@@ -176,6 +186,8 @@ int make_ref_sketch__skethize(const int i) {
     auto chunk_i = sketchize_chunk_i;
     vector<int> *ref_hash_sketch = ref_hash_sketchs[chunk_i];
     int *sketch = similarity_claz->get_sketch(genome_chunks[i], chunk_i, GINGLE_LENGTH, 0);
+    if (sketch[0] == -1)
+        return 0;
 
     // if (i == 90864) { printf(sketch_str(sketch, SKETCH_SIZE).c_str()); printf("\n"); char buffer[32001];
     // strncpy(buffer, genome_chunks[i].seq_str, 32000); buffer[32000] = 0; printf(buffer); printf("\n"); }
@@ -191,7 +203,7 @@ int make_ref_sketch__skethize(const int i) {
         }
 
     delete[] sketch;
-    if ((i / THREADS_COUNT) % (1000 / THREADS_COUNT) == 0)
+    if (i % 1000 == 0)
         logger->debug("loading reference in chunk size 2^%d: %d records", log_chunk, i);
     return 0;
 }
@@ -284,7 +296,7 @@ int main(int argsc, char *argv[]) {
 
     auto config_str = Logger::formatString(
             "shingle length:%d, gap_length:%d, base_number:%d, chunk begin:%d, chunk end:%d", GINGLE_LENGTH, GAP_LENGTH,
-            LOG_MAX_BASENUMBER, log2(CHUNK_SIZES[0]), log2(CHUNK_SIZES[CHUNK_SIZES_LEN - 1]));
+            LOG_MAX_BASENUMBER, int(log2(CHUNK_SIZES[0])), int(log2(CHUNK_SIZES[CHUNK_SIZES_LEN - 1])));
     const char *config = config_str.c_str();
     logger->info("begin with config: %s", config);
     similarity_claz = new BasketMinHash(1, zigma_hash, BIG_PRIME_NUMBER);

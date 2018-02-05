@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -pthread")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -fpermissive")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcmodel=medium")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 
@@ -24,3 +25,4 @@ add_executable(c_long_read_aligner
         aryana/ksw.h aryana/ksw.c aryana/smith.h aryana/smith.c)
 
 target_link_libraries(c_long_read_aligner -lz -lm -lpthread)
+#set(CMAKE_BUILD_TYPE Debug)

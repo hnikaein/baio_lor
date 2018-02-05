@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "basket_min_hash.h"
 #include "configs.h"
 
@@ -15,6 +16,7 @@ int *BasketMinHash::get_sketch(const char *seq_str, const unsigned long seq_str_
                                const int gingle_length, const int gingle_gap) const {
     unsigned int sketch_size = SKETCH_SIZE;
     auto sketch = new int[sketch_size];
+//    auto tmp = new vector<int>();
     fill_n(sketch, sketch_size, max_hash_function);
     unsigned int sketch_step = max_hash_function / (sketch_size - 1);
     int new_hash[gingle_gap + 1] = {};
@@ -23,13 +25,16 @@ int *BasketMinHash::get_sketch(const char *seq_str, const unsigned long seq_str_
             int new_hash_temp = new_hash[j] = hash_function(seq_str + i, gingle_length, new_hash[j], LOG_MAX_BASENUMBER,
                                                             j);
             unsigned int te = new_hash_temp / sketch_step;
+//            tmp->push_back(new_hash_temp);
             if (new_hash_temp < sketch[te])
                 sketch[te] = new_hash_temp;
         }
     for (auto i = static_cast<int>(sketch_size - 2); i >= 0; i -= 1)
         if (sketch[i] == max_hash_function)
             sketch[i] = sketch[i + 1];//(i + 1) * sketch_step - 1;
-
+//    sort(tmp->begin(), tmp->end());
+//    if (tmp->size() < sketch_size)
+//        (*tmp)[0] = -1;
     if (sketch_window > 1) {
         /*
             ssketch = [];
@@ -38,5 +43,6 @@ int *BasketMinHash::get_sketch(const char *seq_str, const unsigned long seq_str_
             return ssketch;
          */
     }
+//    return &(*tmp)[0];
     return sketch;
 }

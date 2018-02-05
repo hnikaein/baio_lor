@@ -50,6 +50,9 @@ int run_aryana_for_ref(const int ref_num) {
     write(p[1], (void *) reads_string.c_str(), reads_string.size());
     close(p[1]);
     stdin = fdopen(p[0], "rb");
+//    auto f = fopen("tmp.tmp", "w");
+//    fwrite(reads_string.c_str(), sizeof(char), reads_string.size(), f);
+//    fclose(f);
 
     unsigned long buf_size = (reads_string.size() + 500 * aryana_helper_results[ref_num].size()) * 3 / 2;
     char buffer[buf_size] = {};
@@ -57,7 +60,7 @@ int run_aryana_for_ref(const int ref_num) {
 
     aryana_args args{};
     args.discordant = 1;
-    args.threads = 1;
+    args.threads = THREADS_COUNT;
     args.potents = 10;
     args.debug = 0;
     args.seed_length = 8; // XXX changed
@@ -76,6 +79,7 @@ int run_aryana_for_ref(const int ref_num) {
     args.min_dis = 0;
     args.max_dis = 10000;
     args.reference = strdup(ref_file_name.c_str());
+//    args.read_file = const_cast<char *>("tmp.tmp");
     args.read_file = const_cast<char *>("-");
     args.single = 1;
     args.paired = 0;
