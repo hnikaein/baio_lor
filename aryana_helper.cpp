@@ -54,7 +54,7 @@ int run_aryana_for_ref(const int ref_num) {
 //    fwrite(reads_string.c_str(), sizeof(char), reads_string.size(), f);
 //    fclose(f);
 
-    int reads_size = static_cast<int>(aryana_helper_results[ref_num].size());
+    auto reads_size = static_cast<int>(aryana_helper_results[ref_num].size());
     unsigned long buf_size = (reads_string.size() + 500 * reads_size) * 3 / 2;
     char buffer[buf_size] = {};
     FILE *tmp_stdout = stdout;
@@ -84,9 +84,10 @@ int run_aryana_for_ref(const int ref_num) {
     args.read_file = const_cast<char *>("-");
     args.single = 1;
     args.paired = 0;
-    logger->debug("begin of aryana for ref_num: %d", ref_num);
+    logger->debug("begin of aryana for ref_num and count: %d -> %d", ref_num, reads_size);
     stdout = fmemopen(buffer, buf_size, "wb");
     bwa_aln_core2(&args);
+    fflush(stdout);
     close(p[0]);
     stdout = tmp_stdout;
     free(args.reference);
@@ -94,6 +95,8 @@ int run_aryana_for_ref(const int ref_num) {
 
     if (!buffer[0]) {
         logger->info("aryana have no result for ref_num: %d and result count: %d", ref_num, reads_size);
+        if (reads_size == 1)
+            logger->debug("which is %d", aryana_helper_results[ref_num][0]);
         return 0;
     }
     istringstream res(buffer);
@@ -145,7 +148,7 @@ void run_aryana(const char *ref_file_base_name, const char *reads_file_name, vec
     for (const auto &p: aryana_helper_results)
         run_aryana_for_ref(p.first);
 //    multiproc(THREADS_COUNT, run_aryana_for_ref, static_cast<int>(reads.size()));
-    ofstream result_file((string(reads_file_name) + ".arayana.sam").c_str());
+    ofstream result_file((string(reads_file_name) + ".aryana.sam").c_str());
     result_file << first_header << endl;
     for (const auto &header :headers)
         result_file << header << endl;

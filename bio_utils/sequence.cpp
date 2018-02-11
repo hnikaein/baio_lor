@@ -38,7 +38,6 @@ Sequence::chunkenize_big_sequence(const vector<Sequence> &seqs, unsigned int chu
     auto chunk_diff = static_cast<int>(chunk_size / 2);
     vector<Sequence> chunks, double_chunks;
     vector<int> starts;
-    starts.push_back(0);
     for (auto &seq : seqs) {
         starts.push_back(static_cast<int>(chunks.size()));
         for (int e1 = 0, chunk_i = 0;

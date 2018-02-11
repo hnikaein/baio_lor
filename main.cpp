@@ -18,17 +18,16 @@
 using namespace std;
 
 //vector<Sequence> ref_chunk_sequences[CHUNK_SIZES_LEN];
-vector<Sequence> reads, ref_genome;
+vector<Sequence> reads, ref_genome, genome_double_chunks;
 vector<int> *ref_hash_sketchs[CHUNK_SIZES_LEN];
-double alt_matchs_ratio = ALT_MATCHS_RATIO_DEFAULT;
 vector<int> genome_parts_starts[CHUNK_SIZES_LEN];
-BasketMinHash *similarity_claz;
 map<int, vector<int>> total_results;
+double alt_matchs_ratio = ALT_MATCHS_RATIO_DEFAULT;
+BasketMinHash *similarity_claz;
 char *ref_file_base_name;
-vector<Sequence> genome_double_chunks;
-unsigned int log_chunk;
 extern Logger *logger;
 
+unsigned int log_chunk;
 
 int create_aryana_indexes(const int part) {
     auto file_name_str = Logger::formatString("%s/%s_%d_%d.fasta", CHUNKS_FOLDER_NAME, ref_file_base_name,
@@ -154,7 +153,10 @@ int align_read(const int read_i) {
         for (int i = 0; i < genome_parts_starts[chunk_i].size() - 1; ++i)
             if (max_simm_i >= genome_parts_starts[chunk_i][i] && max_simm_i < genome_parts_starts[chunk_i][i + 1]) {
                 max_simm_i -= genome_parts_starts[chunk_i][i];
-                total_results[read_i].push_back(max_simm_i / chunk_ratio + genome_parts_starts[CHUNK_SIZES_LEN - 1][i]);
+                int aryana_chunk = max_simm_i / chunk_ratio + genome_parts_starts[CHUNK_SIZES_LEN - 1][i];
+                if (aryana_chunk >= genome_parts_starts[CHUNK_SIZES_LEN - 1][i + 1])
+                    aryana_chunk = genome_parts_starts[CHUNK_SIZES_LEN - 1][i + 1] - 1;
+                total_results[read_i].push_back(aryana_chunk);
                 break;
             }
 
@@ -316,10 +318,13 @@ int main(int argsc, char *argv[]) {
     add_time();
     logger->info("total results:%d", tot_res);
 
+    add_time();
     write_results(ref_file_base_name, reads_file_name);
     logger->info("correct reads for config(%s): %d\nmaking sam files", config, corrects);
+    add_time();
     run_aryana(ref_file_base_name, reads_file_name, reads, total_results);
-    logger->info("total times %s", get_times_str(true));
     delete[] (reads[0].get_name_c() - 1);
+    add_time();
+    logger->info("total times %s", get_times_str(true));
     return 0;
 }
