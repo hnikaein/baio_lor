@@ -154,7 +154,7 @@ int align_read(const int read_i) {
             if (max_simm_i >= genome_parts_starts[chunk_i][i] && max_simm_i < genome_parts_starts[chunk_i][i + 1]) {
                 max_simm_i -= genome_parts_starts[chunk_i][i];
                 int aryana_chunk = max_simm_i / chunk_ratio + genome_parts_starts[CHUNK_SIZES_LEN - 1][i];
-                if (aryana_chunk >= genome_parts_starts[CHUNK_SIZES_LEN - 1][i + 1])
+                if (aryana_chunk == genome_parts_starts[CHUNK_SIZES_LEN - 1][i + 1])
                     aryana_chunk = genome_parts_starts[CHUNK_SIZES_LEN - 1][i + 1] - 1;
                 total_results[read_i].push_back(aryana_chunk);
                 break;

@@ -15,11 +15,12 @@ long long total_candidates = 0, best_factor_candidates = 0;
 extern Logger *logger;
 using namespace std;
 const char *aryana_helper_ref_file_base_name;
-map<int, vector<pair<int, int>>> aryana_helper_results;
+map<int, map<int, int>> aryana_helper_results;
 vector<Sequence> *aryana_helper_reads;
 unordered_set<string> headers;
 vector<string> result_lines;
 string first_header;
+int total_unassigned = 0;
 
 
 int run_aryana_for_ref(const int ref_num) {
@@ -64,7 +65,7 @@ int run_aryana_for_ref(const int ref_num) {
     args.threads = min(THREADS_COUNT, reads_size);
     args.potents = 10;
     args.debug = 0;
-    args.seed_length = 8; // XXX changed
+    args.seed_length = 13; // XXX changed
     args.best_factor = 0.6;
     args.bisulfite = 0;
     args.order = 0;
@@ -106,7 +107,7 @@ int run_aryana_for_ref(const int ref_num) {
     line = line.substr(7, line.find("LN:") - 8);
     size_t sz;
     int offset = max((stoi(line) - 1) * stoi(line.substr(9), &sz) / 2, 0);
-    line = "@SQ\tSN:" + line.substr(10 + sz);
+    line = "@SQ\tSN:" + line.substr(10 + sz) + "\tLN:0";
     headers.insert(line);
     while (getline(res, line)) {
         size_t pos = 0, prev_pos = 0;
@@ -118,14 +119,21 @@ int run_aryana_for_ref(const int ref_num) {
                 name = token;
             if (j == 1 && reads_ref_id.count(name))
                 token = to_string(stoi(token) + 256);
-            if (j == 2)
+            if (j == 2) {
+                if (token[0] == '*')
+                    break;
                 token = token.substr(10 + sz);
+            }
             if (j == 3)
                 token = to_string(stoi(token) + offset);
             new_line.append(token);
             new_line.append("\t");
             prev_pos = pos + 1;
             j++;
+        }
+        if (token.size() == 1) {
+            total_unassigned++;
+            continue;
         }
         token = line.substr(prev_pos);
         new_line.append(token);
@@ -141,14 +149,16 @@ void run_aryana(const char *ref_file_base_name, const char *reads_file_name, vec
         for (int j = 0; j < results[i].size(); j++) {
             auto num_ref = results[i][j];
             if (!aryana_helper_results.count(num_ref))
-                aryana_helper_results[num_ref] = vector<pair<int, int>>();
-            aryana_helper_results[num_ref].emplace_back(i, j);
+                aryana_helper_results[num_ref] = map<int, int>();
+            if (!aryana_helper_results[num_ref].count(i))
+                aryana_helper_results[num_ref][i] = j;
         }
     aryana_helper_reads = &reads;
     for (const auto &p: aryana_helper_results)
         run_aryana_for_ref(p.first);
+    logger->info("total unassigned: %d", total_unassigned);
 //    multiproc(THREADS_COUNT, run_aryana_for_ref, static_cast<int>(reads.size()));
-    ofstream result_file((string(reads_file_name) + ".aryana.sam").c_str());
+    ofstream result_file((string(reads_file_name) + ".aryana").c_str());
     result_file << first_header << endl;
     for (const auto &header :headers)
         result_file << header << endl;
