@@ -118,7 +118,6 @@ int align_read(const int read_i) {
         chunk_i += 1;
     if (chunk_i == CHUNK_SIZES_LEN)
         chunk_i -= 1;
-    const unsigned int chunk_size = CHUNK_SIZES[chunk_i];
 
     auto sketch_read = similarity_claz->get_sketch(read, chunk_i, GINGLE_LENGTH, GAP_LENGTH);
     if (sketch_read[0] == -1) {
@@ -139,7 +138,8 @@ int align_read(const int read_i) {
     int correct_chunk_index = -1, correct_score = -1, correct_rank = -1;
     auto results = unordered_set<int>();
     auto results_score = vector<int>();
-    int chunk_ratio = CHUNK_SIZES[CHUNK_SIZES_LEN - 1] / CHUNK_SIZES[chunk_i];
+    int max_chunk_size = CHUNK_SIZES[CHUNK_SIZES_LEN - 1];
+    int chunk_ratio = max_chunk_size / CHUNK_SIZES[chunk_i];
     while (!scores.empty() && results.size() < MAX_ALT_MATCHS) {
         auto te = scores.back();
         scores.pop_back();
@@ -150,10 +150,11 @@ int align_read(const int read_i) {
         results.insert(max_simm_i);
         results_score.push_back(max_simm);
         logger->debugl2("our result: read:%04d num:%d score:%d index:%d", read_i, results.size(), max_simm, max_simm_i);
+        int aryana_chunk = 0;
         for (int i = 0; i < genome_parts_starts[chunk_i].size() - 1; ++i)
             if (max_simm_i >= genome_parts_starts[chunk_i][i] && max_simm_i < genome_parts_starts[chunk_i][i + 1]) {
                 max_simm_i -= genome_parts_starts[chunk_i][i];
-                int aryana_chunk = max_simm_i / chunk_ratio + genome_parts_starts[CHUNK_SIZES_LEN - 1][i];
+                aryana_chunk = max_simm_i / chunk_ratio + genome_parts_starts[CHUNK_SIZES_LEN - 1][i];
                 if (aryana_chunk == genome_parts_starts[CHUNK_SIZES_LEN - 1][i + 1])
                     aryana_chunk = genome_parts_starts[CHUNK_SIZES_LEN - 1][i + 1] - 1;
                 total_results[read_i].push_back(aryana_chunk);
@@ -162,8 +163,8 @@ int align_read(const int read_i) {
 
         // check is correct or not
         if (correct_score == -1) {
-            if ((max_simm_i - 1) * int(chunk_size) / 2 <= read_begin &&
-                read_begin + read_len <= (max_simm_i + 3) * chunk_size / 2) {
+            if ((aryana_chunk - 1) * int(max_chunk_size) / 2 <= read_begin &&
+                read_begin + read_len <= (aryana_chunk + 3) * max_chunk_size / 2) {
                 correct_rank = static_cast<int>(results.size());
                 correct_chunk_index = max_simm_i;
                 correct_score = max_simm;

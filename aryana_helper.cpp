@@ -8,6 +8,7 @@
 #include "aryana_helper.h"
 #include "configs.h"
 #include "utils/logger.h"
+#include "aryana/aryana_args.h"
 #include <fcntl.h>
 
 long long total_candidates = 0, best_factor_candidates = 0;
@@ -37,9 +38,9 @@ int run_aryana_for_ref(const int ref_num) {
         reads_string.append("@");
         reads_string.append(read->get_name_c());
         reads_string.append("\n");
-        reads_string.append(read->seq_str, 0, 15000);
+        reads_string.append(read->seq_str, 0, 40000);
         reads_string.append("\n+\n");
-        reads_string.append(read->quality_str, 0, 15000);
+        reads_string.append(read->quality_str, 0, 40000);
         reads_string.append("\n");
         if (read_num.second > 0)
             reads_ref_id[read->get_name()] = read_num.second;
@@ -62,10 +63,10 @@ int run_aryana_for_ref(const int ref_num) {
 
     aryana_args args{};
     args.discordant = 1;
-    args.threads = min(THREADS_COUNT, reads_size);
+    args.threads = min(THREADS_COUNT, max(reads_size / 7, 1));
     args.potents = 10;
     args.debug = 0;
-    args.seed_length = 13; // XXX changed
+    args.seed_length = 10; // XXX changed
     args.best_factor = 0.6;
     args.bisulfite = 0;
     args.order = 0;
@@ -85,6 +86,9 @@ int run_aryana_for_ref(const int ref_num) {
     args.read_file = const_cast<char *>("-");
     args.single = 1;
     args.paired = 0;
+    args.tag_size = 2 * CHUNK_SIZES[CHUNK_SIZES_LEN - 1];
+    args.indel_ratio_between_seeds = 2;
+    args.platform = pacbio; // XXX: Added by me
     logger->debug("begin of aryana for ref_num and count: %d -> %d", ref_num, reads_size);
     stdout = fmemopen(buffer, buf_size, "wb");
     bwa_aln_core2(&args);
@@ -152,6 +156,8 @@ void run_aryana(const char *ref_file_base_name, const char *reads_file_name, vec
                 aryana_helper_results[num_ref] = map<int, int>();
             if (!aryana_helper_results[num_ref].count(i))
                 aryana_helper_results[num_ref][i] = j;
+            else
+                logger->debug("multiple candidate for read number: %d, ref number: %d", i, num_ref);
         }
     aryana_helper_reads = &reads;
     for (const auto &p: aryana_helper_results)
