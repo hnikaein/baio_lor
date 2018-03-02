@@ -12,7 +12,7 @@ public:
 
     ~Heap();
 
-    void inc_element(const int &element);
+    void inc_element(const int &element, int value = 1);
 
     std::pair<int, int> pop();
 

@@ -14,13 +14,13 @@ Heap::~Heap() {
 }
 
 
-void Heap::inc_element(const int &element) {
+void Heap::inc_element(const int &element, const int value = 1) {
     if (!indexx.count(element)) {
         h.emplace_back(0, element);
         index[element] = static_cast<int>(h.size() - 1);
         indexx.insert(element);
     }
-    h[index[element]].first += 1;
+    h[index[element]].first += value;
     while (h[index[element]].first > h[index[element] / 2].first) {
         pair<int, int> te1 = move(h[index[element]]);
         h[index[element]] = move(h[index[element] / 2]);
