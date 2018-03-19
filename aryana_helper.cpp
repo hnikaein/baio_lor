@@ -64,7 +64,7 @@ int run_aryana_for_ref(const int ref_num) {
     aryana_args args{};
     args.discordant = 1;
     args.threads = min(THREADS_COUNT, max(reads_size / 7, 1));
-    args.potents = 2; // XXX changed
+    args.potents = 100; // XXX changed
     args.debug = 0;
     args.seed_length = 10; // XXX changed
     args.best_factor = 0.6;
@@ -82,11 +82,11 @@ int run_aryana_for_ref(const int ref_num) {
     args.min_dis = 0;
     args.max_dis = 10000;
     args.reference = strdup(ref_file_name.c_str());
-//    args.read_file = const_cast<char *>("tmp.tmp");
+    //  args.read_file = const_cast<char *>("tmp.tmp");
     args.read_file = const_cast<char *>("-");
     args.single = 1;
     args.paired = 0;
-    args.tag_size = 2 * CHUNK_SIZES[CHUNK_SIZES_LEN - 1]; // XXX: Added by me
+    //  args.tag_size = 2 * CHUNK_SIZES[CHUNK_SIZES_LEN - 1]; // XXX: Added by me
     args.indel_ratio_between_seeds = 2; // XXX: Added by me
     args.platform = pacbio; // XXX: Added by me
     logger->debug("begin of aryana for ref_num and count: %d -> %d", ref_num, reads_size);

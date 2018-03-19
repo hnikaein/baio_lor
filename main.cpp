@@ -150,21 +150,23 @@ int align_read(const int read_i) {
         results.insert(max_simm_i);
         results_score.push_back(max_simm);
         logger->debugl2("our result: read:%04d num:%d score:%d index:%d", read_i, results.size(), max_simm, max_simm_i);
-        int aryana_chunk = 0;
+        int aryana_chunk = 0, aryana_chunk_local = 0;
         for (int i = 0; i < genome_parts_starts[chunk_i].size() - 1; ++i)
             if (max_simm_i >= genome_parts_starts[chunk_i][i] && max_simm_i < genome_parts_starts[chunk_i][i + 1]) {
                 max_simm_i -= genome_parts_starts[chunk_i][i];
-                aryana_chunk = max_simm_i / chunk_ratio + genome_parts_starts[CHUNK_SIZES_LEN - 1][i];
-                if (aryana_chunk == genome_parts_starts[CHUNK_SIZES_LEN - 1][i + 1])
-                    aryana_chunk = genome_parts_starts[CHUNK_SIZES_LEN - 1][i + 1] - 1;
+                aryana_chunk_local = max_simm_i / chunk_ratio;
+                if (aryana_chunk_local ==
+                    genome_parts_starts[CHUNK_SIZES_LEN - 1][i + 1] - genome_parts_starts[CHUNK_SIZES_LEN - 1][i])
+                    aryana_chunk_local--;
+                aryana_chunk = aryana_chunk_local + genome_parts_starts[CHUNK_SIZES_LEN - 1][i];
                 total_results[read_i].push_back(aryana_chunk);
                 break;
             }
 
         // check is correct or not
         if (correct_score == -1) {
-            if ((aryana_chunk - 1) * int(max_chunk_size) / 2 <= read_begin &&
-                read_begin + read_len <= (aryana_chunk + 3) * max_chunk_size / 2) {
+            if ((aryana_chunk_local - 1) * int(max_chunk_size) / 2 <= read_begin &&
+                read_begin + read_len <= (aryana_chunk_local + 3) * max_chunk_size / 2) {
                 correct_rank = static_cast<int>(results.size());
                 correct_chunk_index = max_simm_i;
                 correct_score = max_simm;
@@ -263,7 +265,7 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
                  genome_parts_starts[chunk_i].back());
     genome_chunks.clear();
     if (chunk_i == CHUNK_SIZES_LEN - 1 && !read_index)
-        delete[] ref_genome[0].get_name_c();
+        delete[] ref_genome[0].get_name_c(); //TODO
 }
 
 
@@ -323,6 +325,7 @@ int main(int argsc, char *argv[]) {
     write_results(ref_file_base_name, reads_file_name);
     logger->info("correct reads for config(%s): %d\nmaking sam files", config, corrects);
     add_time();
+
     run_aryana(ref_file_base_name, reads_file_name, reads, total_results);
     delete[] (reads[0].get_name_c() - 1);
     add_time();
