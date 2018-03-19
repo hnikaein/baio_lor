@@ -17,7 +17,6 @@
 
 using namespace std;
 
-//vector<Sequence> ref_chunk_sequences[CHUNK_SIZES_LEN];
 vector<Sequence> reads, ref_genome, genome_double_chunks;
 vector<int> *ref_hash_sketchs[CHUNK_SIZES_LEN];
 vector<int> genome_parts_starts[CHUNK_SIZES_LEN];
@@ -133,8 +132,8 @@ int align_read(const int read_i) {
     delete[] sketch_read;
     delete[] sketch_read_reverse;
 
-    int read_begin = stoi(strstr(read.get_name_c(), "startpos=") + 9);
-    int read_len = stoi(strstr(read.get_name_c(), "length=") + 7);
+    int read_begin = CHECK_CORRECTNESS ? stoi(strstr(read.get_name_c(), "startpos=") + 9) : 0;
+    int read_len = CHECK_CORRECTNESS ? stoi(strstr(read.get_name_c(), "length=") + 7) : 0;
     int correct_chunk_index = -1, correct_score = -1, correct_rank = -1;
     auto results = unordered_set<int>();
     auto results_score = vector<int>();
@@ -164,14 +163,15 @@ int align_read(const int read_i) {
             }
 
         // check is correct or not
-        if (correct_score == -1) {
-            if ((aryana_chunk_local - 1) * int(max_chunk_size) / 2 <= read_begin &&
-                read_begin + read_len <= (aryana_chunk_local + 3) * max_chunk_size / 2) {
-                correct_rank = static_cast<int>(results.size());
-                correct_chunk_index = max_simm_i;
-                correct_score = max_simm;
+        if (CHECK_CORRECTNESS)
+            if (correct_score == -1) {
+                if ((aryana_chunk_local - 1) * max_chunk_size / 2 <= read_begin &&
+                    read_begin + read_len <= (aryana_chunk_local + 3) * max_chunk_size / 2) {
+                    correct_rank = static_cast<int>(results.size());
+                    correct_chunk_index = max_simm_i;
+                    correct_score = max_simm;
+                }
             }
-        }
     }
     logger->debugl2("Read name: %s", read.get_name_c());
     int alt_score = correct_rank == 1 ? (results_score.size() > 1 ? results_score[1] : -1) : results_score[0];
@@ -193,9 +193,6 @@ int make_ref_sketch__skethize(const int i) {
     int *sketch = similarity_claz->get_sketch(genome_chunks[i], chunk_i, GINGLE_LENGTH, 0);
     if (sketch[0] == -1)
         return 0;
-
-    // if (i == 90864) { printf(sketch_str(sketch, SKETCH_SIZE).c_str()); printf("\n"); char buffer[32001];
-    // strncpy(buffer, genome_chunks[i].seq_str, 32000); buffer[32000] = 0; printf(buffer); printf("\n"); }
 
     pthread_mutex_lock(&sketchize_mutex[sketch[0]]);
     ref_hash_sketch[sketch[0]].push_back(i);
@@ -239,9 +236,6 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
             ref_genome = read_from_file(ref_file_name, FASTA);
             add_time();
             logger->info("loaded reference: %d ms", last_time());
-
-            // char buffer[1001]; strncpy(buffer, ref_genome[343].seq_str + 7106518, 1000); buffer[1001] = 0;
-            // printf(buffer);printf("\n");
         }
         vector<int> *ref_hash_sketch = ref_hash_sketchs[chunk_i] = new vector<int>[BIG_PRIME_NUMBER + 2];
 
@@ -265,7 +259,7 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
                  genome_parts_starts[chunk_i].back());
     genome_chunks.clear();
     if (chunk_i == CHUNK_SIZES_LEN - 1 && !read_index)
-        delete[] ref_genome[0].get_name_c(); //TODO
+        delete[] ref_genome[0].get_name_c(); // because we allocate all other names and seqs in bahave of this
 }
 
 
@@ -323,7 +317,7 @@ int main(int argsc, char *argv[]) {
 
     add_time();
     write_results(ref_file_base_name, reads_file_name);
-    logger->info("correct reads for config(%s): %d\nmaking sam files", config, corrects);
+    logger->debug("correct reads for config(%s): %d\nmaking sam files", config, corrects);
     add_time();
 
     run_aryana(ref_file_base_name, reads_file_name, reads, total_results);
