@@ -30,8 +30,8 @@ public:
 
     static std::string formatString(const char *format, ...);
 
-private:
     LogLevel log_level = OFF;
+private:
     std::mutex mtx;
 
     static std::string formatString(const char *format, va_list args);

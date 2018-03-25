@@ -9,6 +9,6 @@
 extern "C" void bwa_aln_core2(aryana_args *args);
 
 void run_aryana(const char *ref_file_name, const char *reads_file_name, std::vector<Sequence> &reads,
-                std::map<int, std::vector<int>> &results);
+                std::map<int, std::vector<int>> &results, int threads_count);
 
 #endif //C_LONG_READ_ALIGNER_ARYANA_HELPER_H

@@ -8,7 +8,6 @@
 #include "aryana_helper.h"
 #include "configs.h"
 #include "utils/logger.h"
-#include "aryana/aryana_args.h"
 #include <fcntl.h>
 
 long long total_candidates = 0, best_factor_candidates = 0;
@@ -24,7 +23,7 @@ string first_header;
 int total_unassigned = 0;
 
 
-int run_aryana_for_ref(const int ref_num) {
+int run_aryana_for_ref(const int ref_num, int threads_count) {
     logger->debug("begin of run_aryana for ref_num: %d", ref_num);
     auto log_chunk = static_cast<int>(log2(CHUNK_SIZES[CHUNK_SIZES_LEN - 1]));
     map<string, int> reads_ref_id;
@@ -52,9 +51,6 @@ int run_aryana_for_ref(const int ref_num) {
     write(p[1], (void *) reads_string.c_str(), reads_string.size());
     close(p[1]);
     stdin = fdopen(p[0], "rb");
-//    auto f = fopen("tmp.tmp", "w");
-//    fwrite(reads_string.c_str(), sizeof(char), reads_string.size(), f);
-//    fclose(f);
 
     auto reads_size = static_cast<int>(aryana_helper_results[ref_num].size());
     unsigned long buf_size = (reads_string.size() + 500 * reads_size) * 3 / 2;
@@ -63,9 +59,9 @@ int run_aryana_for_ref(const int ref_num) {
 
     aryana_args args{};
     args.discordant = 1;
-    args.threads = min(THREADS_COUNT, max(reads_size / 7, 1));
+    args.threads = min(threads_count, max(reads_size / 7, 1));
     args.potents = 100; // XXX changed
-    args.debug = 0;
+    args.debug = logger->log_level - 4;
     args.seed_length = 10; // XXX changed
     args.best_factor = 0.6;
     args.bisulfite = 0;
@@ -82,13 +78,11 @@ int run_aryana_for_ref(const int ref_num) {
     args.min_dis = 0;
     args.max_dis = 10000;
     args.reference = strdup(ref_file_name.c_str());
-    //  args.read_file = const_cast<char *>("tmp.tmp");
     args.read_file = const_cast<char *>("-");
     args.single = 1;
     args.paired = 0;
-    //  args.tag_size = 2 * CHUNK_SIZES[CHUNK_SIZES_LEN - 1]; // XXX: Added by me
     args.indel_ratio_between_seeds = 2; // XXX: Added by me
-    args.platform = pacbio; // XXX: Added by me
+    args.platform = pacbio; // XXX changed
     logger->debug("begin of aryana for ref_num and count: %d -> %d", ref_num, reads_size);
     stdout = fmemopen(buffer, buf_size, "wb");
     bwa_aln_core2(&args);
@@ -146,8 +140,8 @@ int run_aryana_for_ref(const int ref_num) {
     return 0;
 }
 
-void run_aryana(const char *ref_file_base_name, const char *reads_file_name, vector<Sequence> &reads,
-                map<int, vector<int>> &results) {
+void run_aryana(const char *ref_file_base_name, const char *output_file_name, vector<Sequence> &reads,
+                map<int, vector<int>> &results, int threads_count) {
     aryana_helper_ref_file_base_name = ref_file_base_name;
     for (int i = 0; i < reads.size(); ++i)
         for (int j = 0; j < results[i].size(); j++) {
@@ -161,10 +155,9 @@ void run_aryana(const char *ref_file_base_name, const char *reads_file_name, vec
         }
     aryana_helper_reads = &reads;
     for (const auto &p: aryana_helper_results)
-        run_aryana_for_ref(p.first);
+        run_aryana_for_ref(p.first, threads_count);
     logger->info("total unassigned: %d", total_unassigned);
-//    multiproc(THREADS_COUNT, run_aryana_for_ref, static_cast<int>(reads.size()));
-    ofstream result_file((string(reads_file_name) + ".aryana").c_str());
+    ofstream result_file(output_file_name); // TODO convert to fwrite
     result_file << first_header << endl;
     for (const auto &header :headers)
         result_file << header << endl;

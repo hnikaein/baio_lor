@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <iostream>
 #include <sys/stat.h>
+#include <getopt.h>
 #include "aryana/main.h"
 #include "aryana_helper.h"
 
@@ -21,12 +22,71 @@ vector<Sequence> reads, ref_genome, genome_double_chunks;
 vector<int> *ref_hash_sketchs[CHUNK_SIZES_LEN];
 vector<int> genome_parts_starts[CHUNK_SIZES_LEN];
 map<int, vector<int>> total_results;
-double alt_matchs_ratio = ALT_MATCHS_RATIO_DEFAULT;
-BasketMinHash *similarity_claz;
-char *ref_file_base_name;
-extern Logger *logger;
 
+BasketMinHash *similarity_claz;
 unsigned int log_chunk;
+
+
+auto *ref_file_name = const_cast<char *>(REF_FILE_NAME);
+auto *reads_file_name = const_cast<char *>(READS_FILE_NAME);
+auto *output_file_name = const_cast<char *>(OUTPUT_FILE_NAME);
+char *ref_file_base_name;
+int log_level = Logger::INFO, threads_count = THREADS_COUNT;
+bool read_index = READ_INDEX, write_index = WRITE_INDEX, simlord_reads = SIMLORD_READS;
+extern Logger *logger;
+double alt_matchs_ratio = ALT_MATCHS_RATIO;
+
+void read_args(int argc, char *argv[]) {
+    static struct option long_options[] =
+            {
+                    {"threads",         required_argument, nullptr, 't'},
+                    {"ref",             required_argument, nullptr, 'r'},
+                    {"query",           required_argument, nullptr, 'q'},
+                    {"output",          required_argument, nullptr, 'o'},
+                    {"log",             required_argument, nullptr, 'l'},
+                    {"alt-match-ratio", required_argument, nullptr, 'm'},
+                    {"no-read-index",   no_argument,       nullptr, 'n'},
+                    {"no-write-index",  no_argument,       nullptr, 'w'},
+                    {"simlord-reads",   no_argument,       nullptr, 's'},
+            };
+
+    int option_index = 0, c;
+    while ((c = getopt_long(argc, argv, "t:r:q:o:m:l:nws", long_options, &option_index)) >= 0)
+        switch (c) {
+            case 't':
+                threads_count = static_cast<int>(strtol(optarg, nullptr, 10));
+                break;
+            case 'r':
+                ref_file_name = strdup(optarg);
+                break;
+            case 'q':
+                reads_file_name = strdup(optarg);
+                break;
+            case 'o':
+                output_file_name = strdup(optarg);
+                break;
+            case 'm':
+                alt_matchs_ratio = strtod(optarg, nullptr);
+                break;
+            case 'l':
+                log_level = static_cast<int>(strtol(optarg, nullptr, 10));
+                break;
+            case 'n':
+                read_index = false;
+                break;
+            case 'w':
+                write_index = false;
+                break;
+            case 's':
+                simlord_reads = true;
+                break;
+            default:
+                break;
+        }
+    ref_file_base_name = strstr(ref_file_name, "/") + 1;
+    logger = new Logger(log_level);
+    optind = 1;
+}
 
 int create_aryana_indexes(const int part) {
     auto file_name_str = Logger::formatString("%s/%s_%d_%d.fasta", CHUNKS_FOLDER_NAME, ref_file_base_name,
@@ -40,35 +100,6 @@ int create_aryana_indexes(const int part) {
     }
     free(file_name);
     return 0;
-}
-
-string vector_str(int *vec, unsigned long size) {
-    string s;
-    for (int i = 0; i < size; ++i) {
-        s.append(",");
-        s.append(to_string(vec[i]));
-    }
-    return s;
-}
-
-void write_results(const char *ref_file_base_name, const char *reads_file_name) {
-    char endlch = '\n';
-    auto log_chunk = static_cast<int>(log2(CHUNK_SIZES[CHUNK_SIZES_LEN - 1]));
-
-    auto chunks_address = Logger::formatString("%s/%s_%d_%%d.fasta", CHUNKS_FOLDER_NAME, ref_file_base_name, log_chunk);
-
-    auto file = fopen((string(reads_file_name) + ".lra").c_str(), "w");
-
-    fwrite(chunks_address.c_str(), static_cast<size_t>(chunks_address.size()), sizeof(char), file);
-    fwrite(&endlch, static_cast<size_t>(1), sizeof(char), file);
-    fwrite(reads_file_name, static_cast<size_t>(strlen(reads_file_name)), sizeof(char), file);
-    fwrite(&endlch, static_cast<size_t>(1), sizeof(char), file);
-    for (int i = 0; i < reads.size(); ++i) {
-        string line = vector_str(total_results[i].data(), total_results[i].size());
-        fwrite(line.c_str() + 1, static_cast<size_t>(line.size() - 1), sizeof(char), file);
-        fwrite(&endlch, static_cast<size_t>(1), sizeof(char), file);
-    }
-    fclose(file);
 }
 
 vector<pair<int, int>>
@@ -132,8 +163,8 @@ int align_read(const int read_i) {
     delete[] sketch_read;
     delete[] sketch_read_reverse;
 
-    int read_begin = CHECK_CORRECTNESS ? stoi(strstr(read.get_name_c(), "startpos=") + 9) : 0;
-    int read_len = CHECK_CORRECTNESS ? stoi(strstr(read.get_name_c(), "length=") + 7) : 0;
+    int read_begin = simlord_reads ? stoi(strstr(read.get_name_c(), "startpos=") + 9) : 0;
+    int read_len = simlord_reads ? stoi(strstr(read.get_name_c(), "length=") + 7) : 0;
     int correct_chunk_index = -1, correct_score = -1, correct_rank = -1;
     auto results = unordered_set<int>();
     auto results_score = vector<int>();
@@ -163,7 +194,7 @@ int align_read(const int read_i) {
             }
 
         // check is correct or not
-        if (CHECK_CORRECTNESS)
+        if (simlord_reads)
             if (correct_score == -1) {
                 if ((aryana_chunk_local - 1) * max_chunk_size / 2 <= read_begin &&
                     read_begin + read_len <= (aryana_chunk_local + 3) * max_chunk_size / 2) {
@@ -243,10 +274,10 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
                 Sequence::chunkenize_big_sequence(ref_genome, chunk_size, chunk_i == CHUNK_SIZES_LEN - 1);
         if (chunk_i == CHUNK_SIZES_LEN - 1) {
             mkdir(CHUNKS_FOLDER_NAME, 0777);
-            multiproc(THREADS_COUNT, create_aryana_indexes, static_cast<int>(genome_double_chunks.size()));
+            multiproc(threads_count, create_aryana_indexes, static_cast<int>(genome_double_chunks.size()));
         }
         add_time();
-        multiproc(THREADS_COUNT, make_ref_sketch__skethize, static_cast<int>(genome_chunks.size()));
+        multiproc(threads_count, make_ref_sketch__skethize, static_cast<int>(genome_chunks.size()));
     }
     // BIG_PRIME_NUMBER + 1 for genome_parts_starts and last one for ref_chunk_size[chunk_i]
     genome_parts_starts[chunk_i] = ref_hash_sketchs[chunk_i][BIG_PRIME_NUMBER + 1];
@@ -263,35 +294,8 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
 }
 
 
-int main(int argsc, char *argv[]) {
-    auto *ref_file_name = const_cast<char *>(REF_FILE_NAME_DEFAULT);
-    auto *reads_file_name = const_cast<char *>(READS_FILE_NAME_DEFAULT);
-    int log_level = Logger::DEBUG;
-    bool read_index = READ_INDEX, write_index = WRITE_INDEX;
-    for (int i = 0; i < argsc; ++i) {
-        char *key = argv[i];
-        char *value = nullptr;
-        for (int j = 0; argv[i][j] > 0; ++j)
-            if (argv[i][j] == '=') {
-                argv[i][j] = 0;
-                value = argv[i] + j + 1;
-                break;
-            }
-        if (!strcmp(key, "--ref"))
-            ref_file_name = value;
-        if (!strcmp(key, "--reads"))
-            reads_file_name = value;
-        if (!strcmp(key, "--alt-match-ratio"))
-            alt_matchs_ratio = stod(value);
-        if (!strcmp(key, "--log"))
-            log_level = stoi(value);
-        if (!strcmp(key, "--read-index"))
-            read_index = strcmp(value, "false") != 0;
-        if (!strcmp(key, "--write-index"))
-            write_index = strcmp(value, "false") != 0;
-    }
-    ref_file_base_name = strstr(ref_file_name, "/") + 1;
-    logger = new Logger(log_level);
+int main(int argc, char *argv[]) {
+    read_args(argc, argv);
 
     auto config_str = Logger::formatString(
             "shingle length:%d, gap_length:%d, base_number:%d, chunk begin:%d, chunk end:%d", GINGLE_LENGTH, GAP_LENGTH,
@@ -311,16 +315,12 @@ int main(int argsc, char *argv[]) {
 
     for (int i = 0; i < reads.size(); ++i)
         total_results[i] = vector<int>();
-    int corrects = multiproc(THREADS_COUNT, align_read, static_cast<int>(reads.size()));
+    int corrects = multiproc(threads_count, align_read, static_cast<int>(reads.size()));
     add_time();
     logger->info("total results:%d", tot_res);
-
-    add_time();
-    write_results(ref_file_base_name, reads_file_name);
     logger->debug("correct reads for config(%s): %d\nmaking sam files", config, corrects);
-    add_time();
 
-    run_aryana(ref_file_base_name, reads_file_name, reads, total_results);
+    run_aryana(ref_file_base_name, output_file_name, reads, total_results, threads_count);
     delete[] (reads[0].get_name_c() - 1);
     add_time();
     logger->info("total times %s", get_times_str(true));
