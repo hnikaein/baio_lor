@@ -83,12 +83,18 @@ void read_args(int argc, char *argv[]) {
             default:
                 break;
         }
-    ref_file_base_name = strstr(ref_file_name, "/") + 1;
+    ref_file_base_name = strstr(ref_file_name, "/");
+    if (ref_file_base_name == nullptr)
+        ref_file_base_name = ref_file_name;
+    else
+        ref_file_base_name++;
     logger = new Logger(log_level);
     optind = 1;
 }
 
 int create_aryana_indexes(const int part) {
+    if (part % 100 == 0)
+        logger->debugl2("create_aryana_indexes part\t\t%d", part);
     auto file_name_str = Logger::formatString("%s/%s_%d_%d.fasta", CHUNKS_FOLDER_NAME, ref_file_base_name,
                                               log_chunk, part);
     char *file_name = strdup(file_name_str.c_str());
@@ -270,8 +276,10 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
         }
         vector<int> *ref_hash_sketch = ref_hash_sketchs[chunk_i] = new vector<int>[BIG_PRIME_NUMBER + 2];
 
+        logger->debugl2("before chunkenize");
         tie(genome_chunks, genome_double_chunks, ref_hash_sketch[BIG_PRIME_NUMBER + 1]) =
                 Sequence::chunkenize_big_sequence(ref_genome, chunk_size, chunk_i == CHUNK_SIZES_LEN - 1);
+        logger->debugl2("after chunkenize");
         if (chunk_i == CHUNK_SIZES_LEN - 1) {
             mkdir(CHUNKS_FOLDER_NAME, 0777);
             multiproc(threads_count, create_aryana_indexes, static_cast<int>(genome_double_chunks.size()));
