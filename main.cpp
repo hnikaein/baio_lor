@@ -10,7 +10,6 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm>
-#include <iostream>
 #include <sys/stat.h>
 #include <getopt.h>
 #include "aryana/main.h"
@@ -39,19 +38,22 @@ double alt_matchs_ratio = ALT_MATCHS_RATIO;
 void read_args(int argc, char *argv[]) {
     static struct option long_options[] =
             {
-                    {"threads",         required_argument, nullptr, 't'},
-                    {"ref",             required_argument, nullptr, 'r'},
-                    {"query",           required_argument, nullptr, 'q'},
-                    {"output",          required_argument, nullptr, 'o'},
-                    {"log",             required_argument, nullptr, 'l'},
-                    {"alt-match-ratio", required_argument, nullptr, 'm'},
-                    {"no-read-index",   no_argument,       nullptr, 'n'},
-                    {"no-write-index",  no_argument,       nullptr, 'w'},
-                    {"simlord-reads",   no_argument,       nullptr, 's'},
+                    {"threads",            required_argument, nullptr, 't'},
+                    {"ref",                required_argument, nullptr, 'r'},
+                    {"query",              required_argument, nullptr, 'q'},
+                    {"output",             required_argument, nullptr, 'o'},
+                    {"log",                required_argument, nullptr, 'l'},
+                    {"alt-match-ratio",    required_argument, nullptr, 'm'},
+                    {"no-read-index",      no_argument,       nullptr, 'n'},
+                    {"no-write-index",     no_argument,       nullptr, 'w'},
+                    {"simlord-reads",      no_argument,       nullptr, 's'},
+                    {"mismatch-penalty",   no_argument,       nullptr, 'M'},
+                    {"gap-open-penalty",   no_argument,       nullptr, 'O'},
+                    {"gap-extend-penalty", no_argument,       nullptr, 'E'},
             };
 
     int option_index = 0, c;
-    while ((c = getopt_long(argc, argv, "t:r:q:o:m:l:nws", long_options, &option_index)) >= 0)
+    while ((c = getopt_long(argc, argv, "t:r:q:o:m:l:nwsM:O:E:", long_options, &option_index)) >= 0)
         switch (c) {
             case 't':
                 threads_count = static_cast<int>(strtol(optarg, nullptr, 10));
@@ -79,6 +81,15 @@ void read_args(int argc, char *argv[]) {
                 break;
             case 's':
                 simlord_reads = true;
+                break;
+            case 'M':
+                MISMATH_PENALTY = static_cast<int>(strtol(optarg, nullptr, 10));
+                break;
+            case 'O':
+                GAP_OPEN_PENALTY = static_cast<int>(strtol(optarg, nullptr, 10));
+                break;
+            case 'E':
+                GAP_EXTEND_PENALTY = static_cast<int>(strtol(optarg, nullptr, 10));
                 break;
             default:
                 break;
@@ -223,11 +234,13 @@ int align_read(const int read_i) {
 unsigned int sketchize_chunk_i;
 vector<Sequence> genome_chunks;
 pthread_mutex_t sketchize_mutex[BIG_PRIME_NUMBER + 1];
+int make_ref_sketch_gingle_length, make_ref_sketch_gap_length;
 
 int make_ref_sketch__skethize(const int i) {
     auto chunk_i = sketchize_chunk_i;
     vector<int> *ref_hash_sketch = ref_hash_sketchs[chunk_i];
-    int *sketch = similarity_claz->get_sketch(genome_chunks[i], chunk_i, GINGLE_LENGTH, 0);
+    int *sketch = similarity_claz->get_sketch(genome_chunks[i], chunk_i, make_ref_sketch_gingle_length,
+                                              make_ref_sketch_gap_length);
     if (sketch[0] == -1)
         return 0;
 
@@ -285,6 +298,8 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
             multiproc(threads_count, create_aryana_indexes, static_cast<int>(genome_double_chunks.size()));
         }
         add_time();
+        make_ref_sketch_gingle_length = gingle_length;
+        make_ref_sketch_gap_length = gap_length;
         multiproc(threads_count, make_ref_sketch__skethize, static_cast<int>(genome_chunks.size()));
     }
     // BIG_PRIME_NUMBER + 1 for genome_parts_starts and last one for ref_chunk_size[chunk_i]
