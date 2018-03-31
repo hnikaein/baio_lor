@@ -41,7 +41,7 @@ void write_to_file(const char *const file_name, const vector<int> *data, const i
     fclose(file);
 }
 
-vector<int> *read_from_file(char const *file_name) {
+vector<int> *read_vectors_from_file(char const *file_name) {
     struct stat st{};
     auto file = fopen(file_name, "rb");
     if (!file || stat(file_name, &st) != 0)

@@ -6,10 +6,12 @@
 #define BIO_READER_H
 
 enum FileType {
-    FASTA, FASTQ, SAM, BAM
+    FASTA, FASTQ, SAM
 };
 
-std::vector<Sequence> read_from_file(const char *file_name, const FileType &file_type);
+std::vector<Sequence> read_sequences_from_file(const char *file_name);
+
+std::vector<Sequence> read_sequences_from_file(const char *file_name, const FileType &file_type);
 
 std::tuple<std::vector<char *>, std::vector<char *>, std::vector<int>> read_fasta(const char *file_name);
 

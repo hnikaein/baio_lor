@@ -1,9 +1,17 @@
 #include "bio_reader.h"
 #include <sys/stat.h>
+#include <cstring>
 
 using namespace std;
 
-vector<Sequence> read_from_file(const char *const file_name, const FileType &file_type) {
+vector<Sequence> read_sequences_from_file(const char *file_name) {
+    if (tolower(file_name[strlen(file_name) - 1]) == 'a')
+        return move(read_sequences_from_file(file_name, FASTA));
+    else
+        return move(read_sequences_from_file(file_name, FASTQ));
+}
+
+vector<Sequence> read_sequences_from_file(const char *file_name, const FileType &file_type) {
     vector<char *> names, seqs, quality;
     vector<int> lens;
     if (file_type == FASTA)
@@ -17,7 +25,7 @@ vector<Sequence> read_from_file(const char *const file_name, const FileType &fil
     else
         for (int i = 0; i < names.size(); i++)
             l.emplace_back(seqs[i], lens[i], names[i], quality[i]);
-    return l;
+    return move(l);
 }
 
 

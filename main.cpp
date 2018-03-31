@@ -34,6 +34,7 @@ int log_level = Logger::INFO, threads_count = THREADS_COUNT;
 bool read_index = READ_INDEX, write_index = WRITE_INDEX, simlord_reads = SIMLORD_READS;
 extern Logger *logger;
 double alt_matchs_ratio = ALT_MATCHS_RATIO;
+int mismath_penalty = 3, gap_open_penalty = 3, gap_extend_penalty = 2;
 
 void read_args(int argc, char *argv[]) {
     static struct option long_options[] =
@@ -83,13 +84,13 @@ void read_args(int argc, char *argv[]) {
                 simlord_reads = true;
                 break;
             case 'M':
-                MISMATH_PENALTY = static_cast<int>(strtol(optarg, nullptr, 10));
+                mismath_penalty = static_cast<int>(strtol(optarg, nullptr, 10));
                 break;
             case 'O':
-                GAP_OPEN_PENALTY = static_cast<int>(strtol(optarg, nullptr, 10));
+                gap_open_penalty = static_cast<int>(strtol(optarg, nullptr, 10));
                 break;
             case 'E':
-                GAP_EXTEND_PENALTY = static_cast<int>(strtol(optarg, nullptr, 10));
+                gap_extend_penalty = static_cast<int>(strtol(optarg, nullptr, 10));
                 break;
             default:
                 break;
@@ -276,14 +277,14 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
     add_time();
     if (read_index)
         try {
-            ref_hash_sketchs[chunk_i] = read_from_file(index_file_name.c_str());
+            ref_hash_sketchs[chunk_i] = read_vectors_from_file(index_file_name.c_str());
             logger->info("chunk %d read completed", chunk_i);
         } catch (...) {
             read_index = false;
         }
     if (!read_index) {
         if (ref_genome.empty()) {
-            ref_genome = read_from_file(ref_file_name, FASTA);
+            ref_genome = read_sequences_from_file(ref_file_name, FASTA);
             add_time();
             logger->info("loaded reference: %d ms", last_time());
         }
@@ -332,7 +333,7 @@ int main(int argc, char *argv[]) {
         make_ref_sketch(ref_file_name, *similarity_claz, chunk_i, GINGLE_LENGTH, 0, nullptr, write_index, read_index);
     add_time();
 
-    reads = read_from_file(reads_file_name, FASTQ);
+    reads = read_sequences_from_file(reads_file_name);
     add_time();
     logger->info("load reads time: %d ms", last_time());
 

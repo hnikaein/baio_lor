@@ -69,9 +69,9 @@ int run_aryana_for_ref(const int ref_num, int threads_count) {
     args.exactmatch_num = 50;
     args.report_multi = 0;
     args.mismatch_limit = -1;
-    args.mismatch_penalty = MISMATH_PENALTY; // XXX changed
-    args.gap_open_penalty = GAP_OPEN_PENALTY; // XXX changed
-    args.gap_ext_penalty = GAP_EXTEND_PENALTY; // XXX changed
+    args.mismatch_penalty = mismath_penalty; // XXX changed
+    args.gap_open_penalty = gap_open_penalty; // XXX changed
+    args.gap_ext_penalty = gap_extend_penalty; // XXX changed
     args.out_buffer_factor = 100000;
     args.ignore = ignore_none;
     args.orientation = orien_all;

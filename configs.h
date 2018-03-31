@@ -4,7 +4,7 @@
 const unsigned int CHUNK_SIZES[] = {1 << 9, 1 << 11, 1 << 13, 1 << 15};
 const unsigned int SKETCH_SIZES[] = {1 << 7, 1 << 8, 1 << 9, 1 << 10};
 
-int MISMATH_PENALTY = 3, GAP_OPEN_PENALTY = 3, GAP_EXTEND_PENALTY = 2;
+extern int mismath_penalty, gap_open_penalty, gap_extend_penalty;
 
 
 #define BIG_PRIME_NUMBER            14868587
