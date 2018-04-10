@@ -13,6 +13,17 @@ Heap::~Heap() {
     delete[] index;
 }
 
+int Heap::get_value(const int &element) {
+    if (!indexx.count(element))
+        return 0;
+    return h[index[element]].first;
+}
+
+int Heap::top_value() {
+    if (indexx.empty())
+        return 0;
+    return h[1].first;
+}
 
 void Heap::inc_element(const int &element, const int value) {
     if (!indexx.count(element)) {

@@ -128,11 +128,18 @@ align_read__find_res(const int chunk_i, const int *sketch_read, const int *sketc
     int max_score = 0;
     int max_alt_matchs = 0;
     for (auto sketch:{sketch_read, sketch_read_reverse}) {
-        max_alt_matchs += 2 * MAX_ALT_MATCHS;
-        auto scores = Heap(genome_parts_starts[chunk_i].back());
+        vector<tuple<int, int>> hashes_size(SKETCH_SIZE);
         for (int i = 0; i < SKETCH_SIZE; ++i)
+            hashes_size[i] = {static_cast<int>(ref_hash_sketchs[chunk_i][sketch[i]].size()), i};
+        sort(hashes_size.begin(), hashes_size.end());
+        auto scores = Heap(genome_parts_starts[chunk_i].back());
+        for (int k = 0; k < SKETCH_SIZE; ++k) {
+            int i = get<1>(hashes_size[k]);
             for (int j:ref_hash_sketchs[chunk_i][sketch[i]])
-                scores.inc_element(j);
+                if (scores.get_value(j) + (SKETCH_SIZE - k) * 0.5 >= scores.top_value())
+                    scores.inc_element(j);
+        }
+        max_alt_matchs += 2 * MAX_ALT_MATCHS;
         while (scores.has_element() && temp_result.size() < max_alt_matchs) {
             auto p = scores.pop();
             if (p.first < alt_matchs_ratio * max_score)

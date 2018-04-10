@@ -18,6 +18,10 @@ public:
 
     bool has_element();
 
+    int get_value(const int &element);
+
+    int top_value();
+
 private:
     int size;
     std::vector<std::pair<int, int>> h;

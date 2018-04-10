@@ -2,7 +2,7 @@
 #define C_LONG_READ_ALIGNER_CONFIGS_H
 
 const unsigned int CHUNK_SIZES[] = {1 << 9, 1 << 11, 1 << 13, 1 << 15};
-const unsigned int SKETCH_SIZES[] = {1 << 5, 1 << 6, 1 << 7, 1 << 8};
+const unsigned int SKETCH_SIZES[] = {1 << 7, 1 << 8, 1 << 9, 1 << 10};
 
 extern int mismath_penalty, gap_open_penalty, gap_extend_penalty;
 
