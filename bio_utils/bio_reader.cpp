@@ -65,7 +65,7 @@ std::tuple<std::vector<char *>, std::vector<char *>, std::vector<int>> read_fast
                 }
                 continue;
             }
-            result[result_i++] = name_state ? ch : static_cast<char>(toupper(ch));
+            result[result_i++] = ch;
         }
     }
     result[result_i] = '\0';
@@ -115,7 +115,7 @@ read_fastq(const char *const file_name) {
                 if (state == 3)
                     quality.push_back(result + result_i);
             } else if (state != 2)
-                result[result_i++] = state == 1 ? static_cast<char>(toupper(ch)) : ch;
+                result[result_i++] = ch;
         }
     }
     fclose(file);

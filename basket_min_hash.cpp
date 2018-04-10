@@ -12,18 +12,69 @@ int *BasketMinHash::get_sketch(const Sequence &sequence, const unsigned int chun
     return get_sketch(sequence.seq_str, sequence.size, chunk_i, gingle_length, gingle_gap);
 }
 
+//{'A': 904514536, 'C': 628428578, 'G': 631026863, 'T': 907208264, 'N': 161368370}
+inline char nuc_acid_to_int(char nuc) {
+    switch (nuc) {
+        case 'T':
+        case 't':
+            return 3;
+        case 'A':
+        case 'a':
+            return 2;
+        case 'G':
+        case 'g':
+            return 1;
+        case 'C':
+        case 'c':
+            return 0;
+        case 'N':
+        case 'n':
+        case 'Y':
+        case 'y':
+        case 'U':
+        case 'u':
+        case 'K':
+        case 'k':
+        case 'W':
+        case 'w':
+        case 'B':
+        case 'b':
+        case 'D':
+        case 'd':
+        case 'H':
+        case 'h':
+            return 3;
+        case 'R':
+        case 'r':
+        case 'M':
+        case 'm':
+        case 'V':
+        case 'v':
+            return 2;
+        case 'S':
+        case 's':
+            return 1;
+        default:
+            return 3;
+    }
+}
+
+
 int *BasketMinHash::get_sketch(const char *seq_str, const unsigned long seq_str_len, const unsigned int chunk_i,
                                const int gingle_length, const int gingle_gap) const {
     unsigned int sketch_size = SKETCH_SIZE;
     auto sketch = new int[sketch_size];
 //    auto tmp = new vector<int>();
+    char seq_str_int[seq_str_len];
+    for (int i = 0; i < seq_str_len; ++i)
+        seq_str_int[i] = nuc_acid_to_int(seq_str[i]);
     fill_n(sketch, sketch_size, max_hash_function);
     unsigned int sketch_step = max_hash_function / (sketch_size - 1);
     int new_hash[gingle_gap + 1] = {};
     for (int i = 0; i < seq_str_len - gingle_length - gingle_gap; i++)
         for (int j = 0; j <= gingle_gap; j++) {
-            int new_hash_temp = new_hash[j] = hash_function(seq_str + i, gingle_length, new_hash[j], LOG_MAX_BASENUMBER,
-                                                            j);
+            int new_hash_temp = new_hash[j] = hash_function(seq_str_int + i, gingle_length, new_hash[j],
+                                                            LOG_MAX_BASENUMBER, j);
             unsigned int te = new_hash_temp / sketch_step;
 //            tmp->push_back(new_hash_temp);
             if (new_hash_temp < sketch[te])

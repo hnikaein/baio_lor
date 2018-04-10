@@ -16,16 +16,15 @@ string Sequence::get_name() {
 Sequence Sequence::get_reversed() {
     auto *new_seq_str = new char[size + 1];
     new_seq_str -= 1;
-    for (int i = 0; i < size; ++i) {
-        if (seq_str[i] == 'A')
-            new_seq_str[size - i] = 'T';
+    for (int i = 0; i < size; ++i)
         if (seq_str[i] == 'T')
             new_seq_str[size - i] = 'A';
-        if (seq_str[i] == 'C')
-            new_seq_str[size - i] = 'G';
-        if (seq_str[i] == 'G')
+        else if (seq_str[i] == 'A')
+            new_seq_str[size - i] = 'T';
+        else if (seq_str[i] == 'G')
             new_seq_str[size - i] = 'C';
-    }
+        else if (seq_str[i] == 'C')
+            new_seq_str[size - i] = 'G';
     new_seq_str += 1;
     new_seq_str[size] = '\0';
     Sequence sequence(new_seq_str, size, name, quality_str);

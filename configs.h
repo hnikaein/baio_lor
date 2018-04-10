@@ -2,17 +2,16 @@
 #define C_LONG_READ_ALIGNER_CONFIGS_H
 
 const unsigned int CHUNK_SIZES[] = {1 << 9, 1 << 11, 1 << 13, 1 << 15};
-const unsigned int SKETCH_SIZES[] = {1 << 7, 1 << 8, 1 << 9, 1 << 10};
+const unsigned int SKETCH_SIZES[] = {1 << 5, 1 << 6, 1 << 7, 1 << 8};
 
 extern int mismath_penalty, gap_open_penalty, gap_extend_penalty;
 
-
-#define BIG_PRIME_NUMBER            14868587
+#define BIG_PRIME_NUMBER            16777259 // 14868587
 #define SKETCH_SIZE                 SKETCH_SIZES[chunk_i]
-#define LOG_MAX_BASENUMBER          5
+#define LOG_MAX_BASENUMBER          2
 #define GAP_LENGTH                  1
 #define GINGLE_LENGTH               12
-#define THREADS_COUNT               3
+#define THREADS_COUNT               2
 #define MAX_ALT_MATCHS              30
 #define ALT_MATCHS_RATIO            0.70
 #define REF_FILE_NAME               BASE_FILE_NAME ".fasta"
