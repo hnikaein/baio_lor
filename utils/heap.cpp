@@ -14,7 +14,7 @@ Heap::~Heap() {
 }
 
 
-void Heap::inc_element(const int &element, const int value = 1) {
+void Heap::inc_element(const int &element, const int value) {
     if (!indexx.count(element)) {
         h.emplace_back(0, element);
         index[element] = static_cast<int>(h.size() - 1);

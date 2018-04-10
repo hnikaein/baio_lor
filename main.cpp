@@ -95,11 +95,13 @@ void read_args(int argc, char *argv[]) {
             default:
                 break;
         }
-    ref_file_base_name = strstr(ref_file_name, "/");
-    if (ref_file_base_name == nullptr)
-        ref_file_base_name = ref_file_name;
-    else
-        ref_file_base_name++;
+    auto temp_ref_file_base_name = ref_file_name;
+    while (temp_ref_file_base_name != nullptr) {
+        if (temp_ref_file_base_name[0] == '/')
+            temp_ref_file_base_name++;
+        ref_file_base_name = temp_ref_file_base_name;
+        temp_ref_file_base_name = strstr(temp_ref_file_base_name, "/");
+    }
     logger = new Logger(log_level);
     optind = 1;
 }
@@ -161,6 +163,10 @@ int tot_res = 0;
 
 int align_read(const int read_i) {
     Sequence &read = reads[read_i];
+    if (read.size < GINGLE_LENGTH + GAP_LENGTH) {
+        logger->info("removing read %d", read_i);
+        return 0;
+    }
     unsigned int chunk_i = 0;
     while (chunk_i < CHUNK_SIZES_LEN and CHUNK_SIZES[chunk_i] < read.size)
         chunk_i += 1;
@@ -341,11 +347,11 @@ int main(int argc, char *argv[]) {
         total_results[i] = vector<int>();
     int corrects = multiproc(threads_count, align_read, static_cast<int>(reads.size()));
     add_time();
-    logger->info("total results:%d", tot_res);
-    logger->debug("correct reads for config(%s): %d\nmaking sam files", config, corrects);
+    logger->debug("total results:%d", tot_res);
+    logger->info("correct reads for config(%s): %d\t\t\ttimes: %s", config, corrects, get_times_str(false));
 
     run_aryana(ref_file_base_name, output_file_name, reads, total_results, threads_count);
-    delete[] (reads[0].get_name_c() - 1);
+    delete[] (reads[0].get_name_c() - 1); // TODO error for pacbio
     add_time();
     logger->info("total times %s", get_times_str(true));
     return 0;

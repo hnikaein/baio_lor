@@ -11,7 +11,7 @@ extern int mismath_penalty, gap_open_penalty, gap_extend_penalty;
 #define LOG_MAX_BASENUMBER          2
 #define GAP_LENGTH                  1
 #define GINGLE_LENGTH               12
-#define THREADS_COUNT               2
+#define THREADS_COUNT               1
 #define MAX_ALT_MATCHS              30
 #define ALT_MATCHS_RATIO            0.70
 #define REF_FILE_NAME               BASE_FILE_NAME ".fasta"
