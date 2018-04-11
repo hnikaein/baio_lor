@@ -61,7 +61,7 @@ int run_aryana_for_ref(const int ref_num, int threads_count) {
     args.discordant = 1;
     args.threads = min(threads_count, max(reads_size / 7, 1));
     args.potents = 100; // XXX changed
-    args.debug = logger->log_level - 4;
+    args.debug = logger->log_level - 5;
     args.seed_length = 10; // XXX changed
     args.best_factor = 0.6;
     args.bisulfite = 0;

@@ -75,10 +75,14 @@ int *BasketMinHash::get_sketch(const char *seq_str, const unsigned long seq_str_
         for (int j = 0; j <= gingle_gap; j++) {
             int new_hash_temp = new_hash[j] = hash_function(seq_str_int + i, gingle_length, new_hash[j],
                                                             LOG_MAX_BASENUMBER, j);
-            unsigned int te = new_hash_temp / sketch_step;
+            new_hash_temp = (~new_hash_temp + (new_hash_temp << 21)) & BIG_PRIME_NUMBER;
+            new_hash_temp = (new_hash_temp + (new_hash_temp << 3) + (new_hash_temp << 8)) & BIG_PRIME_NUMBER;
+            new_hash_temp ^= (new_hash_temp >> 14);
+            new_hash_temp = (new_hash_temp + (new_hash_temp << 2) + (new_hash_temp << 4)) & BIG_PRIME_NUMBER;
+            unsigned int sketch_i = new_hash_temp / sketch_step;
 //            tmp->push_back(new_hash_temp);
-            if (new_hash_temp < sketch[te])
-                sketch[te] = new_hash_temp;
+            if (new_hash_temp < sketch[sketch_i])
+                sketch[sketch_i] = new_hash_temp;
         }
     for (auto i = static_cast<int>(sketch_size - 2); i >= 0; i -= 1)
         if (sketch[i] == max_hash_function)

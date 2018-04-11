@@ -31,12 +31,12 @@ int zigma_hash(const char *seq_str_int, int length, int prev_hash, int shift_len
         res = prev_hash;
         res -= seq_str_int[-1] * a_k;
         res += (seq_str_int[length_2_1] - seq_str_int[length_2_1 + gingle_gap]) * a_k2;
-        res %= p;
-        if (res < 0)
-            res += p;
+//        res %= p;
+//        if (res < 0)
+//            res += p;
         res <<= a;
         res += seq_str_int[length + gingle_gap - 1];
-        res %= p;
+//        res %= p;
         return res;
     }
 }

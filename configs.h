@@ -6,7 +6,7 @@ const unsigned int SKETCH_SIZES[] = {1 << 7, 1 << 8, 1 << 9, 1 << 10};
 
 extern int mismath_penalty, gap_open_penalty, gap_extend_penalty;
 
-#define BIG_PRIME_NUMBER            16777259 // 14868587
+#define BIG_PRIME_NUMBER            16777215 // 14868587 16777259
 #define SKETCH_SIZE                 SKETCH_SIZES[chunk_i]
 #define LOG_MAX_BASENUMBER          2
 #define GAP_LENGTH                  1
