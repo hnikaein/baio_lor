@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.9)
-project(c_long_read_aligner)
+project(baio_lor)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS}  -O3")
@@ -11,7 +11,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -Wno-unused-result")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mcmodel=medium")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 
-add_executable(c_long_read_aligner
+add_executable(baio_lor
         main.cpp
         aryana_helper.h aryana_helper.cpp
         configs.h hash_utils.cpp hash_utils.h basket_min_hash.cpp basket_min_hash.h
@@ -26,5 +26,5 @@ add_executable(c_long_read_aligner
         aryana/bwtgap.h aryana/bwtgap.c aryana/bamlite.h aryana/bamlite.c aryana/bwa.h aryana/bwa.c
         aryana/ksw.h aryana/ksw.c aryana/smith.h aryana/smith.c)
 
-target_link_libraries(c_long_read_aligner -lz -lm -lpthread)
+target_link_libraries(baio_lor -lz -lm -lpthread)
 #set(CMAKE_BUILD_TYPE Debug)
