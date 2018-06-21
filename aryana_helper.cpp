@@ -12,18 +12,21 @@
 #include "aryana/aryana_args.h"
 #include <fcntl.h>
 
-long long total_candidates = 0, best_factor_candidates = 0;
-
-extern Logger *logger;
 using namespace std;
+
+long long total_candidates = 0, best_factor_candidates = 0;
+extern Logger *logger;
+extern int threads_count;
+
 const char *aryana_helper_ref_file_base_name;
 map<int, map<int, int>> aryana_helper_results;
 vector<Sequence> *aryana_helper_reads;
+
+pthread_mutex_t output_lock;
+string first_header;
 unordered_set<string> headers;
 vector<string> result_lines;
-string first_header;
 int total_unassigned = 0;
-extern int threads_count;
 
 
 int run_aryana_for_ref(const int ref_num) {
@@ -59,7 +62,7 @@ int run_aryana_for_ref(const int ref_num) {
     char buffer[buf_size] = {};
 
     auto stdout_file = fmemopen(buffer, buf_size, "wb");
-    stdin = fdopen(p[0], "rb");//fmemopen((void *) reads_string.c_str(), reads_string.size(), "rb");
+    auto stdin_file = fdopen(p[0], "rb");//fmemopen((void *) reads_string.c_str(), reads_string.size(), "rb");
 
     aryana_args args{};
     args.discordant = 1;
@@ -82,7 +85,11 @@ int run_aryana_for_ref(const int ref_num) {
     args.min_dis = 0;
     args.max_dis = 10000;
     args.reference = strdup(ref_file_name.c_str());
-    args.read_file = const_cast<char *>("-");
+    args.read_file = new char[10];
+    args.read_file[0] = '+';
+    for (int i = 1; i < 10; i++)
+        args.read_file[i] = '\0';
+    memcpy(args.read_file + 2, &stdin_file, sizeof(stdin_file));
     args.stdout_file = stdout_file;
     args.single = 1;
     args.paired = 0;
@@ -102,6 +109,7 @@ int run_aryana_for_ref(const int ref_num) {
         return 0;
     }
     istringstream res(buffer);
+    pthread_mutex_lock(&output_lock);
     getline(res, first_header);
     string line;
     getline(res, line);
@@ -110,6 +118,7 @@ int run_aryana_for_ref(const int ref_num) {
     int offset = max((stoi(line) - 1) * stoi(line.substr(9), &sz) / 2, 0);
     line = "@SQ\tSN:" + line.substr(10 + sz) + "\tLN:0";
     headers.insert(line);
+    pthread_mutex_unlock(&output_lock);
     while (getline(res, line)) {
         size_t pos = 0, prev_pos = 0;
         int j = 0;
@@ -133,12 +142,16 @@ int run_aryana_for_ref(const int ref_num) {
             j++;
         }
         if (token.size() == 1) {
+            pthread_mutex_lock(&output_lock);
             total_unassigned++;
+            pthread_mutex_unlock(&output_lock);
             continue;
         }
         token = line.substr(prev_pos);
         new_line.append(token);
+        pthread_mutex_lock(&output_lock);
         result_lines.push_back(new_line);
+        pthread_mutex_unlock(&output_lock);
     }
     return 0;
 }
@@ -160,7 +173,7 @@ void run_aryana(const char *ref_file_base_name, const char *output_file_name, ve
     vector<int> refs;
     for (const auto &p: aryana_helper_results)
         refs.push_back(p.first);
-    multiproc(1, run_aryana_for_ref, refs);
+    multiproc(threads_count, run_aryana_for_ref, refs);
     logger->info("total unassigned: %d", total_unassigned);
     ofstream result_file(output_file_name); // TODO convert to fwrite
     result_file << first_header << endl;

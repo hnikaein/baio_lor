@@ -14,11 +14,11 @@ extern int mismath_penalty, gap_open_penalty, gap_extend_penalty;
 #define THREADS_COUNT               1
 #define MAX_ALT_MATCHS              30
 #define ALT_MATCHS_RATIO            0.70
+#define BASE_FILE_NAME              "seqs/ecoli"
 #define REF_FILE_NAME               BASE_FILE_NAME ".fasta"
 #define READS_FILE_NAME             BASE_FILE_NAME ".reads.fastq"
 #define OUTPUT_FILE_NAME            READS_FILE_NAME ".sam"
-#define BASE_FILE_NAME              "seqs/ecoli"
-#define CHUNKS_FOLDER_NAME          "chunks"
+#define CHUNKS_FOLDER_NAME          "seqs/chunks"
 #define SIMLORD_READS               false
 
 
