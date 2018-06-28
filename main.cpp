@@ -12,27 +12,26 @@
 #include <algorithm>
 #include <sys/stat.h>
 #include <getopt.h>
-#include "aryana/main.h"
 #include "aryana_helper.h"
 
 using namespace std;
 
 vector<Sequence> reads, ref_genome, genome_double_chunks;
+map<int, vector<int>> lor_results;
 vector<int> *ref_hash_sketchs[CHUNK_SIZES_LEN];
 vector<int> genome_parts_starts[CHUNK_SIZES_LEN];
-map<int, vector<int>> total_results;
 
 BasketMinHash *similarity_claz;
 unsigned int log_chunk;
 
 
-auto *ref_file_name = const_cast<char *>(REF_FILE_NAME);
-auto *reads_file_name = const_cast<char *>(READS_FILE_NAME);
-auto *output_file_name = const_cast<char *>(OUTPUT_FILE_NAME);
-char *ref_file_base_name;
-int log_level = Logger::INFO, threads_count = THREADS_COUNT;
-bool read_index = READ_INDEX, write_index = WRITE_INDEX, simlord_reads = SIMLORD_READS;
 extern Logger *logger;
+int log_level = Logger::INFO, threads_count = THREADS_COUNT;
+auto *ref_file_name = const_cast<char *>(REF_FILE_NAME);
+auto *output_file_name = const_cast<char *>(OUTPUT_FILE_NAME);
+auto *reads_file_name = const_cast<char *>(READS_FILE_NAME);
+char *ref_file_base_name;
+bool read_index = READ_INDEX, write_index = WRITE_INDEX, simlord_reads = SIMLORD_READS;
 double alt_matchs_ratio = ALT_MATCHS_RATIO;
 int mismath_penalty = 3, gap_open_penalty = 3, gap_extend_penalty = 2;
 
@@ -104,22 +103,6 @@ void read_args(int argc, char *argv[]) {
     }
     logger = new Logger(log_level);
     optind = 1;
-}
-
-int create_aryana_indexes(const int part) {
-    if (part % 100 == 0)
-        logger->debugl2("create_aryana_indexes part\t\t%d", part);
-    auto file_name_str = Logger::formatString("%s/%s_%d_%d.fasta", CHUNKS_FOLDER_NAME, ref_file_base_name,
-                                              log_chunk, part);
-    char *file_name = strdup(file_name_str.c_str());
-    if (!genome_double_chunks[part].write_to_file(file_name, false, false)) {
-        char *argv[] = {const_cast<char *>("index"), file_name};
-        bwa_index(2, argv);
-        argv[0] = const_cast<char *>("fa2bin");
-        fa2bin(2, argv);
-    }
-    free(file_name);
-    return 0;
 }
 
 vector<pair<int, int>>
@@ -220,7 +203,7 @@ int align_read(const int read_i) {
                     genome_parts_starts[CHUNK_SIZES_LEN - 1][i + 1] - genome_parts_starts[CHUNK_SIZES_LEN - 1][i])
                     aryana_chunk_local--;
                 aryana_chunk = aryana_chunk_local + genome_parts_starts[CHUNK_SIZES_LEN - 1][i];
-                total_results[read_i].push_back(aryana_chunk);
+                lor_results[read_i].push_back(aryana_chunk);
                 break;
             }
 
@@ -276,17 +259,15 @@ int make_ref_sketch__skethize(const int i) {
 
 
 auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &similarity_class, const unsigned int chunk_i,
-                     const int gingle_length, const int gap_length, const char *const index_base_file_name = nullptr,
-                     const bool write_index = WRITE_INDEX, bool read_index = READ_INDEX) {
+                     const int gingle_length, const int gap_length, const bool write_index = WRITE_INDEX,
+                     bool read_index = READ_INDEX) {
     auto chunk_size = CHUNK_SIZES[chunk_i];
 
     sketchize_chunk_i = chunk_i;
     log_chunk = static_cast<unsigned int>(log2(chunk_size));
 
-    auto index_file_name =
-            Logger::formatString("%s_%d_%d_%d_%d_%d.gin",
-                                 index_base_file_name == nullptr ? ref_file_name : index_base_file_name, SKETCH_SIZE,
-                                 gingle_length, gap_length, LOG_MAX_BASENUMBER, log_chunk);
+    auto index_file_name = Logger::formatString("%s_%d_%d_%d_%d_%d.gin", ref_file_name, SKETCH_SIZE, gingle_length,
+                                                gap_length, LOG_MAX_BASENUMBER, log_chunk);
     add_time();
     if (read_index)
         try {
@@ -309,8 +290,8 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
         logger->debugl2("after chunkenize");
         if (chunk_i == CHUNK_SIZES_LEN - 1) {
             mkdir(CHUNKS_FOLDER_NAME, 0777);
-            multiproc(threads_count, create_aryana_indexes, static_cast<int>(genome_double_chunks.size()));
         }
+        create_aryana_index();
         add_time();
         make_ref_sketch_gingle_length = gingle_length;
         make_ref_sketch_gap_length = gap_length;
@@ -343,7 +324,7 @@ int main(int argc, char *argv[]) {
     add_time();
 
     for (unsigned int chunk_i = 0; chunk_i < CHUNK_SIZES_LEN; chunk_i++)
-        make_ref_sketch(ref_file_name, *similarity_claz, chunk_i, GINGLE_LENGTH, 0, nullptr, write_index, read_index);
+        make_ref_sketch(ref_file_name, *similarity_claz, chunk_i, GINGLE_LENGTH, 0, write_index, read_index);
     add_time();
 
     reads = read_sequences_from_file(reads_file_name);
@@ -351,13 +332,13 @@ int main(int argc, char *argv[]) {
     logger->info("load reads time: %d ms", last_time());
 
     for (int i = 0; i < reads.size(); ++i)
-        total_results[i] = vector<int>();
+        lor_results[i] = vector<int>();
     int corrects = multiproc(threads_count, align_read, static_cast<int>(reads.size()));
     add_time();
     logger->debug("total results:%d", tot_res);
     logger->info("correct reads for config(%s): %d\t\t\ttimes: %s", config, corrects, get_times_str(false));
 
-    run_aryana(ref_file_base_name, output_file_name, reads, total_results, threads_count);
+    run_aryana();
     delete[] (reads[0].get_name_c() - 1); // TODO error for pacbio
     add_time();
     logger->info("total times %s", get_times_str(true));

@@ -64,7 +64,7 @@ const char *Sequence::get_name_c() {
     return name;
 }
 
-int Sequence::write_to_file(const char *file_name, const bool append, const bool force_write) {
+int Sequence::write_to_file(const char *file_name, const bool append, const bool force_write) const {
     if (!force_write) {
         struct stat st{};
         if (stat(file_name, &st) == 0)
