@@ -288,10 +288,8 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
         tie(genome_chunks, genome_double_chunks, ref_hash_sketch[BIG_PRIME_NUMBER + 1]) =
                 Sequence::chunkenize_big_sequence(ref_genome, chunk_size, chunk_i == CHUNK_SIZES_LEN - 1);
         logger->debugl2("after chunkenize");
-        if (chunk_i == CHUNK_SIZES_LEN - 1) {
-            mkdir(CHUNKS_FOLDER_NAME, 0777);
-        }
-        create_aryana_index();
+        if (chunk_i == CHUNK_SIZES_LEN - 1)
+            create_aryana_index();
         add_time();
         make_ref_sketch_gingle_length = gingle_length;
         make_ref_sketch_gap_length = gap_length;
