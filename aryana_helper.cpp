@@ -36,7 +36,7 @@ unordered_set<string> headers;
 vector<string> result_lines;
 int total_unassigned = 0;
 int index_size;
-int *poses;
+long *poses;
 FILE *index_files[4];
 
 
@@ -199,8 +199,8 @@ void run_aryana() {
 
     auto index_of_index = fopen(Logger::formatString("%s.ind", ref_file_name).c_str(), "rb");
     fread(&index_size, sizeof(int), 1, index_of_index);
-    poses = new int[index_size * 4];
-    fread(poses, sizeof(int), static_cast<size_t>(index_size * 4), index_of_index);
+    poses = new long[index_size * 4];
+    fread(poses, sizeof(long), static_cast<size_t>(index_size * 4), index_of_index);
     fclose(index_of_index);
     for (int i = 0; i < 4; ++i)
         index_files[i] = fopen(Logger::formatString("%s%s", ref_file_name, index_suffixes[i]).c_str(), "rb");
@@ -222,7 +222,7 @@ void run_aryana() {
 
 int aryana_index_part(const int i) {
     char src_file_base_name[strlen(ref_file_name) + 10];
-    sprintf(src_file_base_name, "%s.%d\0", ref_file_name, i);
+    sprintf(src_file_base_name, "%s.%d", ref_file_name, i);
     genome_double_chunks[i].write_to_file(src_file_base_name, false, false);
     char *argv[] = {const_cast<char *>("index"), src_file_base_name};
     bwa_index(2, argv);
@@ -250,9 +250,9 @@ void create_aryana_index() {
         multiproc(1, aryana_index_part, part_end, i);
         for (int ii = i; ii < part_end; ++ii) {
             sprintf(src_file_base_name, "%s.%d", ref_file_name, ii);
-            int poses[4];
+            long poses[4];
             for (int j = 0; j < 4; ++j) {
-                poses[j] = static_cast<int>(ftell(dst_files[j]));
+                poses[j] = ftell(dst_files[j]);
                 auto src_file_name = Logger::formatString("%s%s", src_file_base_name, index_suffixes[j]);
                 auto src = fopen(src_file_name.c_str(), "rb");
                 size_t size = static_cast<int>(fread(buffer, 1, index_buffer_size, src));
@@ -262,7 +262,7 @@ void create_aryana_index() {
             }
             for (int j = 0; j < 3; ++j)
                 remove(Logger::formatString("%s%s", src_file_base_name, dumb_suffixes[j]).c_str());
-            fwrite(poses, sizeof(int), 4, index_of_index);
+            fwrite(poses, sizeof(long), 4, index_of_index);
         }
     }
     fclose(index_of_index);
