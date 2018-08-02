@@ -221,10 +221,10 @@ void run_aryana() {
 }
 
 int aryana_index_part(const int i) {
-    char src_file_base_name[strlen(ref_file_name) + 10];
-    sprintf(src_file_base_name, "%s.%d", ref_file_name, i);
-    genome_double_chunks[i].write_to_file(src_file_base_name, false, false);
-    char *argv[] = {const_cast<char *>("index"), src_file_base_name};
+    char ref_file_name_chunk[strlen(ref_file_name) + 10];
+    sprintf(ref_file_name_chunk, "%s.%d", ref_file_name, i);
+    genome_double_chunks[i].write_to_file(ref_file_name_chunk, false, false);
+    char *argv[] = {const_cast<char *>("index"), ref_file_name_chunk};
     bwa_index(2, argv);
     argv[0] = const_cast<char *>("fa2bin");
     fa2bin(2, argv);
@@ -242,32 +242,29 @@ void create_aryana_index() {
     auto index_of_index = fopen(Logger::formatString("%s.ind", ref_file_name).c_str(), "wb");
 
     char buffer[index_buffer_size];
-    char *src_file_base_name = (char *) calloc(strlen(ref_file_name) + 10, 1);
     int genome_chunk_length = static_cast<int>(genome_double_chunks.size());
     fwrite(&genome_chunk_length, sizeof(int), 1, index_of_index);
     for (int i = 0; i < genome_chunk_length; i += 100) {
         int part_end = min(i + 100, genome_chunk_length);
         multiproc(1, aryana_index_part, part_end, i);
         for (int ii = i; ii < part_end; ++ii) {
-            sprintf(src_file_base_name, "%s.%d", ref_file_name, ii);
             long poses[4];
             for (int j = 0; j < 4; ++j) {
                 poses[j] = ftell(dst_files[j]);
-                auto src_file_name = Logger::formatString("%s%s", src_file_base_name, index_suffixes[j]);
-                auto src = fopen(src_file_name.c_str(), "rb");
+                auto index_file_name = Logger::formatString("%s.%d%s", ref_file_name, ii, index_suffixes[j]);
+                auto src = fopen(index_file_name.c_str(), "rb");
                 size_t size = static_cast<int>(fread(buffer, 1, index_buffer_size, src));
                 fwrite(buffer, 1, size, dst_files[j]);
                 fclose(src);
-                remove(src_file_name.c_str());
+                remove(index_file_name.c_str());
             }
             for (int j = 0; j < 3; ++j)
-                remove(Logger::formatString("%s%s", src_file_base_name, dumb_suffixes[j]).c_str());
+                remove(Logger::formatString("%s.%d%s", ref_file_name, ii, dumb_suffixes[j]).c_str());
             fwrite(poses, sizeof(long), 4, index_of_index);
         }
     }
     fclose(index_of_index);
     for (int i = 0; i < 4; ++i)
         fclose(dst_files[i]);
-    free(src_file_base_name);
 }
 
