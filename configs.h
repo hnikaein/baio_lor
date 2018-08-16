@@ -4,7 +4,7 @@
 const unsigned int CHUNK_SIZES[] = {1 << 9, 1 << 11, 1 << 13, 1 << 15};
 const unsigned int SKETCH_SIZES[] = {1 << 7, 1 << 8, 1 << 9, 1 << 10};
 
-extern int mismath_penalty, gap_open_penalty, gap_extend_penalty;
+extern int match_score, mismath_penalty, gap_open_penalty, gap_extend_penalty;
 
 #define BIG_PRIME_NUMBER            16777215 // 14868587 16777259
 #define SKETCH_SIZE                 SKETCH_SIZES[chunk_i]
@@ -14,10 +14,6 @@ extern int mismath_penalty, gap_open_penalty, gap_extend_penalty;
 #define THREADS_COUNT               1
 #define MAX_ALT_MATCHS              30
 #define ALT_MATCHS_RATIO            0.70
-#define BASE_FILE_NAME              "seqs/ecoli"
-#define REF_FILE_NAME               BASE_FILE_NAME ".fasta"
-#define READS_FILE_NAME             BASE_FILE_NAME ".reads.fastq"
-#define OUTPUT_FILE_NAME            READS_FILE_NAME ".sam"
 #define SIMLORD_READS               false
 
 

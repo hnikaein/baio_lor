@@ -27,13 +27,10 @@ unsigned int log_chunk;
 
 extern Logger *logger;
 int log_level = Logger::INFO, threads_count = THREADS_COUNT;
-auto *ref_file_name = const_cast<char *>(REF_FILE_NAME);
-auto *output_file_name = const_cast<char *>(OUTPUT_FILE_NAME);
-auto *reads_file_name = const_cast<char *>(READS_FILE_NAME);
-char *ref_file_base_name;
+char *ref_file_name, *output_file_name, *reads_file_name;
 bool read_index = READ_INDEX, write_index = WRITE_INDEX, simlord_reads = SIMLORD_READS;
 double alt_matchs_ratio = ALT_MATCHS_RATIO;
-int mismath_penalty = 3, gap_open_penalty = 3, gap_extend_penalty = 2;
+int match_score = 0, mismath_penalty = 3, gap_open_penalty = 3, gap_extend_penalty = 2;
 
 void read_args(int argc, char *argv[]) {
     static struct option long_options[] =
@@ -47,13 +44,14 @@ void read_args(int argc, char *argv[]) {
                     {"no-read-index",      no_argument,       nullptr, 'n'},
                     {"no-write-index",     no_argument,       nullptr, 'w'},
                     {"simlord-reads",      no_argument,       nullptr, 's'},
-                    {"mismatch-penalty",   no_argument,       nullptr, 'M'},
-                    {"gap-open-penalty",   no_argument,       nullptr, 'O'},
-                    {"gap-extend-penalty", no_argument,       nullptr, 'E'},
+                    {"match-score",        required_argument, nullptr, 'A'},
+                    {"mismatch-penalty",   required_argument, nullptr, 'B'},
+                    {"gap-open-penalty",   required_argument, nullptr, 'O'},
+                    {"gap-extend-penalty", required_argument, nullptr, 'E'},
             };
 
     int option_index = 0, c;
-    while ((c = getopt_long(argc, argv, "t:r:q:o:m:l:nwsM:O:E:", long_options, &option_index)) >= 0)
+    while ((c = getopt_long(argc, argv, "t:r:q:o:m:l:nwsA:B:O:E:", long_options, &option_index)) >= 0)
         switch (c) {
             case 't':
                 threads_count = static_cast<int>(strtol(optarg, nullptr, 10));
@@ -82,7 +80,10 @@ void read_args(int argc, char *argv[]) {
             case 's':
                 simlord_reads = true;
                 break;
-            case 'M':
+            case 'A':
+                match_score = static_cast<int>(strtol(optarg, nullptr, 10));
+                break;
+            case 'B':
                 mismath_penalty = static_cast<int>(strtol(optarg, nullptr, 10));
                 break;
             case 'O':
@@ -94,13 +95,6 @@ void read_args(int argc, char *argv[]) {
             default:
                 break;
         }
-    auto temp_ref_file_base_name = ref_file_name;
-    while (temp_ref_file_base_name != nullptr) {
-        if (temp_ref_file_base_name[0] == '/')
-            temp_ref_file_base_name++;
-        ref_file_base_name = temp_ref_file_base_name;
-        temp_ref_file_base_name = strstr(temp_ref_file_base_name, "/");
-    }
     logger = new Logger(log_level);
     optind = 1;
 }
@@ -312,7 +306,19 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
 
 int main(int argc, char *argv[]) {
     read_args(argc, argv);
-
+//    {
+//        auto i = 197118;
+//        auto chunk_i = CHUNK_SIZES_LEN - 1;
+//        auto chunk_size = CHUNK_SIZES[chunk_i];
+//        ref_genome = read_sequences_from_file(ref_file_name, FASTA);
+//        vector<int> *ref_hash_sketch = ref_hash_sketchs[chunk_i] = new vector<int>[BIG_PRIME_NUMBER + 2];
+//        tie(genome_chunks, genome_double_chunks, ref_hash_sketch[BIG_PRIME_NUMBER + 1]) =
+//                Sequence::chunkenize_big_sequence(ref_genome, chunk_size, chunk_i == CHUNK_SIZES_LEN - 1);
+//        char ref_file_name_chunk[strlen(ref_file_name) + 10];
+//        sprintf(ref_file_name_chunk, "%s.%d", ref_file_name, i);
+//        genome_double_chunks[i].write_to_file(ref_file_name_chunk, false, false);
+//        return 0;
+//    }
     auto config_str = Logger::formatString(
             "shingle length:%d, gap_length:%d, base_number:%d, chunk begin:%d, chunk end:%d", GINGLE_LENGTH, GAP_LENGTH,
             LOG_MAX_BASENUMBER, int(log2(CHUNK_SIZES[0])), int(log2(CHUNK_SIZES[CHUNK_SIZES_LEN - 1])));
