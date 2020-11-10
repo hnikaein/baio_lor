@@ -63,41 +63,52 @@ inline char nuc_acid_to_int(char nuc) {
 int *BasketMinHash::get_sketch(const char *seq_str, const unsigned long seq_str_len, const unsigned int chunk_i,
                                const int gingle_length, const int gingle_gap) const {
     unsigned int sketch_size = SKETCH_SIZE;
+    unsigned int sketch_step = max_hash_function / (sketch_size - 1);
+
     auto sketch = new int[sketch_size];
-//    auto tmp = new vector<int>();
+    fill_n(sketch, sketch_size, max_hash_function);
+    // auto tmp = new vector<int>();
+
+    // Change chars to int
     char seq_str_int[seq_str_len];
     for (int i = 0; i < seq_str_len; ++i)
         seq_str_int[i] = nuc_acid_to_int(seq_str[i]);
-    fill_n(sketch, sketch_size, max_hash_function);
-    unsigned int sketch_step = max_hash_function / (sketch_size - 1);
+
     int new_hash[gingle_gap + 1] = {};
-    for (int i = 0; i < seq_str_len - gingle_length - gingle_gap; i++)
+    for (int i = 0; i < seq_str_len - gingle_length - gingle_gap; i++) {
         for (int j = 0; j <= gingle_gap; j++) {
             int new_hash_temp = new_hash[j] = hash_function(seq_str_int + i, gingle_length, new_hash[j],
                                                             LOG_MAX_BASENUMBER, j);
+
+            // Randomize hash
             new_hash_temp = (~new_hash_temp + (new_hash_temp << 21)) & BIG_PRIME_NUMBER;
             new_hash_temp = (new_hash_temp + (new_hash_temp << 3) + (new_hash_temp << 8)) & BIG_PRIME_NUMBER;
             new_hash_temp ^= (new_hash_temp >> 14);
             new_hash_temp = (new_hash_temp + (new_hash_temp << 2) + (new_hash_temp << 4)) & BIG_PRIME_NUMBER;
+
+            // Find the basket this hash belongs to
             unsigned int sketch_i = new_hash_temp / sketch_step;
-//            tmp->push_back(new_hash_temp);
+            // tmp->push_back(new_hash_temp);
             if (new_hash_temp < sketch[sketch_i])
                 sketch[sketch_i] = new_hash_temp;
         }
+    }
+
+    // if there is no hash for a basket, fills it with the next basket
     for (auto i = static_cast<int>(sketch_size - 2); i >= 0; i -= 1)
         if (sketch[i] == max_hash_function)
-            sketch[i] = sketch[i + 1];//(i + 1) * sketch_step - 1;
-//    sort(tmp->begin(), tmp->end());
-//    if (tmp->size() < sketch_size)
-//        (*tmp)[0] = -1;
-    if (sketch_window > 1) {
-        /*
-            ssketch = [];
-            for (int i =0; i <sketch_size; i+= sketch_window)
-                ssketch.append(mmh3.hash(string(sketch + i:i + self.sketch_window])));
-            return ssketch;
-         */
-    }
-//    return &(*tmp)[0];
+            sketch[i] = sketch[i + 1];  // (i + 1) * sketch_step - 1;
+
+    // sort(tmp->begin(), tmp->end());
+    // if (tmp->size() < sketch_size)
+    //    (*tmp)[0] = -1;
+    // if (sketch_window > 1) {
+    //     ssketch = [];
+    //     for (int i =0; i <sketch_size; i+= sketch_window)
+    //         ssketch.append(mmh3.hash(string(sketch + i:i + self.sketch_window])));
+    //     return ssketch;
+    // }
+    // return &(*tmp)[0];
+
     return sketch;
 }

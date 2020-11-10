@@ -34,24 +34,25 @@ int match_score = 0, mismath_penalty = 3, gap_open_penalty = 3, gap_extend_penal
 
 void read_args(int argc, char *argv[]) {
     static struct option long_options[] =
-            {
-                    {"threads",            required_argument, nullptr, 't'},
-                    {"ref",                required_argument, nullptr, 'r'},
-                    {"query",              required_argument, nullptr, 'q'},
-                    {"output",             required_argument, nullptr, 'o'},
-                    {"log",                required_argument, nullptr, 'l'},
-                    {"alt-match-ratio",    required_argument, nullptr, 'm'},
-                    {"no-read-index",      no_argument,       nullptr, 'n'},
-                    {"no-write-index",     no_argument,       nullptr, 'w'},
-                    {"simlord-reads",      no_argument,       nullptr, 's'},
-                    {"match-score",        required_argument, nullptr, 'A'},
-                    {"mismatch-penalty",   required_argument, nullptr, 'B'},
-                    {"gap-open-penalty",   required_argument, nullptr, 'O'},
-                    {"gap-extend-penalty", required_argument, nullptr, 'E'},
-            };
+        {
+            {"threads",            required_argument, nullptr, 't'},  // number of threads
+            {"ref",                required_argument, nullptr, 'r'},  // path to reference file
+            {"query",              required_argument, nullptr, 'q'},  // path to reads
+            {"output",             required_argument, nullptr, 'o'},  // path to output file
+            {"log",                required_argument, nullptr, 'l'},  // log level
+            {"alt-match-ratio",    required_argument, nullptr, 'm'},  // selecting tags with "tag_score >= alt_matchs_ratio * max_tag_score"
+            {"no-read-index",      no_argument,       nullptr, 'n'},  // don't read the saved index
+            {"no-write-index",     no_argument,       nullptr, 'w'},  // don't write the index
+            {"simlord-reads",      no_argument,       nullptr, 's'},  // reads come from simlord simulator
+            {"match-score",        required_argument, nullptr, 'A'},  // use in alignment
+            {"mismatch-penalty",   required_argument, nullptr, 'B'},  // use in alignment
+            {"gap-open-penalty",   required_argument, nullptr, 'O'},  // use in alignment
+            {"gap-extend-penalty", required_argument, nullptr, 'E'},  // use in alignment
+        };
 
     int option_index = 0, c;
     while ((c = getopt_long(argc, argv, "t:r:q:o:m:l:nwsA:B:O:E:", long_options, &option_index)) >= 0)
+    {
         switch (c) {
             case 't':
                 threads_count = static_cast<int>(strtol(optarg, nullptr, 10));
@@ -95,39 +96,64 @@ void read_args(int argc, char *argv[]) {
             default:
                 break;
         }
+    }
+
     logger = new Logger(log_level);
     optind = 1;
 }
 
+
+// return pairs of <score, tag_id> that maybe have the read in them. these pairs will filter again
 vector<pair<int, int>>
 align_read__find_res(const int chunk_i, const int *sketch_read, const int *sketch_read_reverse) {
     auto temp_result = vector<pair<int, int>>();
     int max_score = 0;
     int max_alt_matchs = 0;
+
     for (auto sketch:{sketch_read, sketch_read_reverse}) {
+        // Calculate how many tags(chunks) has a specific hash in read sketch in
+        // pairs of <number of tags, sketch_i>
         vector<tuple<int, int>> hashes_size(SKETCH_SIZE);
         for (int i = 0; i < SKETCH_SIZE; ++i)
             hashes_size[i] = {static_cast<int>(ref_hash_sketchs[chunk_i][sketch[i]].size()), i};
+
+        // sort hashes_size ascending based on number of tags.
+        // hashes that are rare, are more probable to identify the read better.
         sort(hashes_size.begin(), hashes_size.end());
+        // Create a heap with max size of "number of tags"
         auto scores = Heap(genome_parts_starts[chunk_i].back());
+
+        // Search for similar tags (have similar sketch with read)
         for (int k = 0; k < SKETCH_SIZE; ++k) {
             int i = get<1>(hashes_size[k]);
-            for (int j:ref_hash_sketchs[chunk_i][sketch[i]])
+            for (int j : ref_hash_sketchs[chunk_i][sketch[i]]) {
+                // if optimistically this tag has the 0.5 of the remaining hashes of sketch (very similar),
+                // can it beat the top score? if true, increase its score by 1
                 if (scores.get_value(j) + (SKETCH_SIZE - k) * 0.5 >= scores.top_value())
                     scores.inc_element(j);
+            }
         }
+
+        // Select best tags
         max_alt_matchs += 2 * MAX_ALT_MATCHS;
         while (scores.has_element() && temp_result.size() < max_alt_matchs) {
             auto p = scores.pop();
+
             if (p.first < alt_matchs_ratio * max_score)
                 break;
+
             temp_result.push_back(p);
+
             if (p.first > max_score)
                 max_score = p.first;
         }
     }
+
+    // Filter the tags again, because we saw read and its reverse complement independently
+    // Sort tags based on their scores.
     sort(temp_result.begin(), temp_result.end(),
          [](const pair<int, int> &a, const pair<int, int> &b) { return a.first < b.first; });
+
     unsigned long temp_result_size = temp_result.size();
     if (temp_result_size > 0) {
         int first_score = temp_result[temp_result_size - 1].first;
@@ -135,42 +161,55 @@ align_read__find_res(const int chunk_i, const int *sketch_read, const int *sketc
         for (i = static_cast<int>(temp_result_size - 2); i >= 0; --i)
             if (temp_result[i].first < alt_matchs_ratio * first_score)
                 break;
+
         auto result = vector<pair<int, int>>(temp_result_size - i - 1);
         for (int k = i + 1; k < temp_result_size; ++k)
             result[k - i - 1] = move(temp_result[k]);
         return result;
-    } else
+    } else {
         return vector<pair<int, int>>();
+    }
 }
 
 int tot_res = 0;
 
+// Find tags that probably contain read "i"
 int align_read(const int read_i) {
     Sequence &read = reads[read_i];
     if (read.size < GINGLE_LENGTH + GAP_LENGTH) {
         logger->info("removing read %d", read_i);
         return 0;
     }
+
+    // Find the first chunk size greater than read length.
+    // If read length is bigger than all chunk sizes, use the last chunk size.
     unsigned int chunk_i = 0;
     while (chunk_i < CHUNK_SIZES_LEN and CHUNK_SIZES[chunk_i] < read.size)
         chunk_i += 1;
     if (chunk_i == CHUNK_SIZES_LEN)
         chunk_i -= 1;
 
+    // Get sketch for read
     auto sketch_read = similarity_claz->get_sketch(read, chunk_i, GINGLE_LENGTH, GAP_LENGTH);
     if (sketch_read[0] == -1) {
         logger->info("removing read %d", read_i);
         return 0;
     }
+
+    // Get sketch for reverse complement of read
     auto sketch_read_reverse = similarity_claz->get_sketch(read.get_reversed(), chunk_i, GINGLE_LENGTH, GAP_LENGTH);
     if (sketch_read_reverse[0] == -1) {
         logger->info("removing read %d", read_i);
         return 0;
     }
+
+    // Find tags that maybe have this read
     auto scores = align_read__find_res(chunk_i, sketch_read, sketch_read_reverse);
     delete[] sketch_read;
     delete[] sketch_read_reverse;
 
+    // Find which tags should be search by aryana.
+    // because we only index aryana for double size of the last chunk size.
     int read_begin = simlord_reads ? stoi(strstr(read.get_name_c(), "startpos=") + 9) : 0;
     int read_len = simlord_reads ? stoi(strstr(read.get_name_c(), "length=") + 7) : 0;
     int correct_chunk_index = -1, correct_score = -1, correct_rank = -1;
@@ -227,24 +266,30 @@ vector<Sequence> genome_chunks;
 pthread_mutex_t sketchize_mutex[BIG_PRIME_NUMBER + 1];
 int make_ref_sketch_gingle_length, make_ref_sketch_gap_length;
 
+
+// Calculate the chunk sketch and add the chunk id to hashes that exist in chunk sketch
 int make_ref_sketch__skethize(const int i) {
     auto chunk_i = sketchize_chunk_i;
     vector<int> *ref_hash_sketch = ref_hash_sketchs[chunk_i];
+    // Get sketch for chunk i
     int *sketch = similarity_claz->get_sketch(genome_chunks[i], chunk_i, make_ref_sketch_gingle_length,
                                               make_ref_sketch_gap_length);
-    if (sketch[0] == -1)
-        return 0;
 
+    if (sketch[0] == -1) return 0;
+
+    // Add this chunk id to hashes that exist in chunk sketch
     pthread_mutex_lock(&sketchize_mutex[sketch[0]]);
     ref_hash_sketch[sketch[0]].push_back(i);
     pthread_mutex_unlock(&sketchize_mutex[sketch[0]]);
-    for (int j = 1; j < SKETCH_SIZE; ++j)
+    for (int j = 1; j < SKETCH_SIZE; ++j) {
         if (sketch[j] != sketch[j - 1]) {
             pthread_mutex_lock(&sketchize_mutex[sketch[j]]);
             ref_hash_sketch[sketch[j]].push_back(i);
             pthread_mutex_unlock(&sketchize_mutex[sketch[j]]);
         }
+    }
 
+    // Release memory
     delete[] sketch;
     if (i % 1000 == 0)
         logger->debug("loading reference in chunk size 2^%d: %d records", log_chunk, i);
@@ -252,6 +297,7 @@ int make_ref_sketch__skethize(const int i) {
 }
 
 
+// Create sketch for reference genome tags
 auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &similarity_class, const unsigned int chunk_i,
                      const int gingle_length, const int gap_length, const bool write_index = WRITE_INDEX,
                      bool read_index = READ_INDEX) {
@@ -263,49 +309,67 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
     auto index_file_name = Logger::formatString("%s_%d_%d_%d_%d_%d.gin", ref_file_name, SKETCH_SIZE, gingle_length,
                                                 gap_length, LOG_MAX_BASENUMBER, log_chunk);
     add_time();
-    if (read_index)
+
+    if (read_index) {
         try {
             ref_hash_sketchs[chunk_i] = read_vectors_from_file(index_file_name.c_str());
             logger->info("chunk %d read completed", chunk_i);
         } catch (...) {
             read_index = false;
         }
+    }
     if (!read_index) {
         if (ref_genome.empty()) {
+            // Load reference from file
             ref_genome = read_sequences_from_file(ref_file_name, FASTA);
             add_time();
             logger->info("loaded reference: %d ms", last_time());
         }
+
+        // for chunk_i, create a array of vectors, each vector containing the tags id with that
+        // hash number.
         vector<int> *ref_hash_sketch = ref_hash_sketchs[chunk_i] = new vector<int>[BIG_PRIME_NUMBER + 2];
 
         logger->debugl2("before chunkenize");
+        // Create chunks
         tie(genome_chunks, genome_double_chunks, ref_hash_sketch[BIG_PRIME_NUMBER + 1]) =
-                Sequence::chunkenize_big_sequence(ref_genome, chunk_size, chunk_i == CHUNK_SIZES_LEN - 1);
+            Sequence::chunkenize_big_sequence(ref_genome, chunk_size, chunk_i == CHUNK_SIZES_LEN - 1);
         logger->debugl2("after chunkenize");
+
+        // if it's the biggest chunk_size, create aryana index for chunks too
         if (chunk_i == CHUNK_SIZES_LEN - 1)
             create_aryana_index();
         add_time();
+
         make_ref_sketch_gingle_length = gingle_length;
         make_ref_sketch_gap_length = gap_length;
+
+        // Calculate the sketch for chunks
         multiproc(threads_count, make_ref_sketch__skethize, static_cast<int>(genome_chunks.size()));
     }
+
     // BIG_PRIME_NUMBER + 1 for genome_parts_starts and last one for ref_chunk_size[chunk_i]
     genome_parts_starts[chunk_i] = ref_hash_sketchs[chunk_i][BIG_PRIME_NUMBER + 1];
     add_time();
 
+    // Write the index to file if needed
     if (!read_index && write_index)
         write_to_file(index_file_name.c_str(), ref_hash_sketchs[chunk_i], BIG_PRIME_NUMBER + 2);
     add_time();
+
     logger->info("loaded reference sketch/names in chunk size 2^%d: %sms: %d records", log_chunk, get_times_str(true),
                  genome_parts_starts[chunk_i].back());
+
+    // Release memory
     genome_chunks.clear();
     if (chunk_i == CHUNK_SIZES_LEN - 1 && !read_index)
-        delete[] ref_genome[0].get_name_c(); // because we allocate all other names and seqs in bahave of this
+        delete[] ref_genome[0].get_name_c();  // because we allocate all other names and seqs in bahave of this
 }
 
 
 int main(int argc, char *argv[]) {
     read_args(argc, argv);
+
 //    {
 //        auto i = 197118;
 //        auto chunk_i = CHUNK_SIZES_LEN - 1;
@@ -319,31 +383,39 @@ int main(int argc, char *argv[]) {
 //        genome_double_chunks[i].write_to_file(ref_file_name_chunk, false, false);
 //        return 0;
 //    }
+
     auto config_str = Logger::formatString(
             "shingle length:%d, gap_length:%d, base_number:%d, chunk begin:%d, chunk end:%d", GINGLE_LENGTH, GAP_LENGTH,
             LOG_MAX_BASENUMBER, int(log2(CHUNK_SIZES[0])), int(log2(CHUNK_SIZES[CHUNK_SIZES_LEN - 1])));
     const char *config = config_str.c_str();
     logger->info("begin with config: %s", config);
+
     similarity_claz = new BasketMinHash(1, zigma_hash, BIG_PRIME_NUMBER);
     add_time();
 
+    // Create sketch for reference tags
     for (unsigned int chunk_i = 0; chunk_i < CHUNK_SIZES_LEN; chunk_i++)
         make_ref_sketch(ref_file_name, *similarity_claz, chunk_i, GINGLE_LENGTH, 0, write_index, read_index);
     add_time();
 
+    // Load reads
     reads = read_sequences_from_file(reads_file_name);
     add_time();
     logger->info("load reads time: %d ms", last_time());
 
+    // For each read, find chunks that probably contain it
     for (int i = 0; i < reads.size(); ++i)
         lor_results[i] = vector<int>();
+
     int corrects = multiproc(threads_count, align_read, static_cast<int>(reads.size()));
     add_time();
     logger->debug("total results:%d", tot_res);
     logger->info("correct reads for config(%s): %d\t\t\ttimes: %s", config, corrects, get_times_str(false));
 
+    // Find read in selected chunks, with aryana, of course!
     run_aryana();
-    delete[] (reads[0].get_name_c() - 1); // TODO error for pacbio
+
+    delete[] (reads[0].get_name_c() - 1);  // TODO: error for pacbio
     add_time();
     logger->info("total times %s", get_times_str(true));
     return 0;

@@ -32,6 +32,18 @@ Sequence Sequence::get_reversed() {
     return move(sequence);
 }
 
+
+/**
+ * Create chunks(tags) for multiple sequences
+ * 
+ * @param seqs the sequences for chunkenize
+ * @param chunk_size chunk size
+ * @param double_needed if true, create the chunks with `2 * chunk_size` length too
+ * 
+ * @return primary chunks
+ * @return double length chunks if needed
+ * @return the start points of each sequence on primary chunks vector
+ */
 tuple<vector<Sequence>, vector<Sequence>, vector<int>>
 Sequence::chunkenize_big_sequence(const vector<Sequence> &seqs, unsigned int chunk_size, const bool double_needed) {
     auto chunk_diff = static_cast<int>(chunk_size / 2);
