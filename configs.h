@@ -1,15 +1,15 @@
 #ifndef C_LONG_READ_ALIGNER_CONFIGS_H
 #define C_LONG_READ_ALIGNER_CONFIGS_H
 
-const unsigned int CHUNK_SIZES[] = {1 << 9, 1 << 11, 1 << 13, 1 << 15};
-const unsigned int SKETCH_SIZES[] = {1 << 7, 1 << 8, 1 << 9, 1 << 10};
+const unsigned int CHUNK_SIZES[] = {1 << 9};
+const unsigned int SKETCH_SIZES[] = {1 << 7};
 
 extern int match_score, mismath_penalty, gap_open_penalty, gap_extend_penalty;
 
 #define BIG_PRIME_NUMBER            16777215 // 14868587 16777259
 #define SKETCH_SIZE                 SKETCH_SIZES[chunk_i]
 #define LOG_MAX_BASENUMBER          2
-#define GAP_LENGTH                  1
+#define GAP_LENGTH                  0  // No gap needed
 #define GINGLE_LENGTH               12
 #define THREADS_COUNT               1
 #define MAX_ALT_MATCHS              30

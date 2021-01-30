@@ -19,6 +19,7 @@ using namespace std;
 vector<Sequence> reads, ref_genome, genome_double_chunks;
 map<int, vector<int>> lor_results;
 vector<int> *ref_hash_sketchs[CHUNK_SIZES_LEN];
+vector<char*> *ref_hash_sketchs_kmers[CHUNK_SIZES_LEN];
 vector<int> genome_parts_starts[CHUNK_SIZES_LEN];
 
 BasketMinHash *similarity_claz;
@@ -105,17 +106,49 @@ void read_args(int argc, char *argv[]) {
 
 // return pairs of <score, tag_id> that maybe have the read in them. these pairs will filter again
 vector<pair<int, int>>
-align_read__find_res(const int chunk_i, const int *sketch_read, const int *sketch_read_reverse) {
+align_read__find_res(const int chunk_i, const int *sketch_read, const char **sketch_kmers_read,
+                     const int *sketch_read_reverse, const char **sketch_kmers_read_reverse) {
     auto temp_result = vector<pair<int, int>>();
     int max_score = 0;
     int max_alt_matchs = 0;
 
-    for (auto sketch:{sketch_read, sketch_read_reverse}) {
-        // Calculate how many tags(chunks) has a specific hash in read sketch in
-        // pairs of <number of tags, sketch_i>
+    const int *sketchs[] {sketch_read, sketch_read_reverse};
+    const char **sketchs_kmers[] {sketch_kmers_read, sketch_kmers_read_reverse};
+
+    for (int sketch_i = 0; sketch_i < 2; ++sketch_i) {
+        auto sketch = sketchs[sketch_i];
+        auto sketch_kmers = sketchs_kmers[sketch_i];
+
+        // Calculate how many tags(chunks) has a specific hash  for 
+        // all hashes in sketch. out format is pairs of <number of tags, sketch index>
         vector<tuple<int, int>> hashes_size(SKETCH_SIZE);
-        for (int i = 0; i < SKETCH_SIZE; ++i)
-            hashes_size[i] = {static_cast<int>(ref_hash_sketchs[chunk_i][sketch[i]].size()), i};
+        vector<int> *similar_ref_tags = new vector<int>[SKETCH_SIZE];
+        for (int i = 0; i < SKETCH_SIZE; ++i) {
+            for (int j = 0; j < ref_hash_sketchs[chunk_i][sketch[i]].size(); ++j) {
+                int tag_id = ref_hash_sketchs[chunk_i][sketch[i]][j];
+                char *tag_kmer = ref_hash_sketchs_kmers[chunk_i][sketch[i]][j];
+                const char *read_kmer = sketch_kmers[sketch[i]];
+
+                // Check for similar kmers
+                bool same_kmer = true;
+                for (int k = 0; k < GINGLE_LENGTH; ++k) {
+                    if (toupper(read_kmer[k]) == toupper(tag_kmer[k]))
+                        continue;
+
+                    // Because of methylation, T in read, can be assigned to C in tag too
+                    if (toupper(read_kmer[k]) == 'T' && toupper(tag_kmer[k]) == 'C')
+                        continue;
+
+                    same_kmer = false;
+                    break;
+                }
+
+                if (same_kmer)
+                    similar_ref_tags[sketch[i]].push_back(tag_id);
+            }
+
+            hashes_size[i] = {static_cast<int>(similar_ref_tags[sketch[i]].size()), i};
+        }
 
         // sort hashes_size ascending based on number of tags.
         // hashes that are rare, are more probable to identify the read better.
@@ -126,13 +159,16 @@ align_read__find_res(const int chunk_i, const int *sketch_read, const int *sketc
         // Search for similar tags (have similar sketch with read)
         for (int k = 0; k < SKETCH_SIZE; ++k) {
             int i = get<1>(hashes_size[k]);
-            for (int j : ref_hash_sketchs[chunk_i][sketch[i]]) {
+            for (int j : similar_ref_tags[sketch[i]]) {
                 // if optimistically this tag has the 0.5 of the remaining hashes of sketch (very similar),
                 // can it beat the top score? if true, increase its score by 1
                 if (scores.get_value(j) + (SKETCH_SIZE - k) * 0.5 >= scores.top_value())
                     scores.inc_element(j);
             }
         }
+
+        // Release memory
+        delete[] similar_ref_tags;
 
         // Select best tags
         max_alt_matchs += 2 * MAX_ALT_MATCHS;
@@ -149,7 +185,7 @@ align_read__find_res(const int chunk_i, const int *sketch_read, const int *sketc
         }
     }
 
-    // Filter the tags again, because we saw read and its reverse complement independently
+    // Filter the tags again, because we saw read and its reverse complement independently.
     // Sort tags based on their scores.
     sort(temp_result.begin(), temp_result.end(),
          [](const pair<int, int> &a, const pair<int, int> &b) { return a.first < b.first; });
@@ -190,23 +226,35 @@ int align_read(const int read_i) {
         chunk_i -= 1;
 
     // Get sketch for read
-    auto sketch_read = similarity_claz->get_sketch(read, chunk_i, GINGLE_LENGTH, GAP_LENGTH);
+    int *sketch_read; char **sketch_kmers_read;
+    tie(sketch_read, sketch_kmers_read) = similarity_claz->get_sketch(read, chunk_i, GINGLE_LENGTH, GAP_LENGTH);
     if (sketch_read[0] == -1) {
         logger->info("removing read %d", read_i);
         return 0;
     }
 
     // Get sketch for reverse complement of read
-    auto sketch_read_reverse = similarity_claz->get_sketch(read.get_reversed(), chunk_i, GINGLE_LENGTH, GAP_LENGTH);
+    int *sketch_read_reverse; char **sketch_kmers_read_reverse;
+    tie(sketch_read_reverse, sketch_kmers_read_reverse) = similarity_claz->get_sketch(read.get_reversed(), chunk_i, GINGLE_LENGTH, GAP_LENGTH);
     if (sketch_read_reverse[0] == -1) {
         logger->info("removing read %d", read_i);
         return 0;
     }
 
     // Find tags that maybe have this read
-    auto scores = align_read__find_res(chunk_i, sketch_read, sketch_read_reverse);
+    auto scores = align_read__find_res(chunk_i, sketch_read, sketch_kmers_read, sketch_read_reverse, sketch_kmers_read_reverse);
+
+    // Release memory
     delete[] sketch_read;
     delete[] sketch_read_reverse;
+    for (int j = 0; j < SKETCH_SIZE; ++j) {
+        if (sketch_kmers_read[j] != NULL)
+            delete[] sketch_kmers_read[j];
+        if (sketch_kmers_read_reverse[j] != NULL)
+            delete[] sketch_kmers_read_reverse[j];
+    }
+    delete[] sketch_kmers_read;
+    delete[] sketch_kmers_read_reverse;
 
     // Find which tags should be search by aryana.
     // because we only index aryana for double size of the last chunk size.
@@ -270,27 +318,34 @@ int make_ref_sketch_gingle_length, make_ref_sketch_gap_length;
 // Calculate the chunk sketch and add the chunk id to hashes that exist in chunk sketch
 int make_ref_sketch__skethize(const int i) {
     auto chunk_i = sketchize_chunk_i;
-    vector<int> *ref_hash_sketch = ref_hash_sketchs[chunk_i];
-    // Get sketch for chunk i
-    int *sketch = similarity_claz->get_sketch(genome_chunks[i], chunk_i, make_ref_sketch_gingle_length,
-                                              make_ref_sketch_gap_length);
+    auto ref_hash_sketch = ref_hash_sketchs[chunk_i];
+    auto ref_hash_sketch_kmers = ref_hash_sketchs_kmers[chunk_i];
+
+    int *sketch; char **sketch_kmers;
+    std::tie(sketch, sketch_kmers) = similarity_claz->get_sketch(
+        genome_chunks[i],
+        chunk_i,
+        make_ref_sketch_gingle_length,
+        make_ref_sketch_gap_length
+    );
 
     if (sketch[0] == -1) return 0;
 
     // Add this chunk id to hashes that exist in chunk sketch
-    pthread_mutex_lock(&sketchize_mutex[sketch[0]]);
-    ref_hash_sketch[sketch[0]].push_back(i);
-    pthread_mutex_unlock(&sketchize_mutex[sketch[0]]);
-    for (int j = 1; j < SKETCH_SIZE; ++j) {
-        if (sketch[j] != sketch[j - 1]) {
+    int j = 0;
+    do {
+        if (j > 0 || sketch[j] != sketch[j - 1]) {
             pthread_mutex_lock(&sketchize_mutex[sketch[j]]);
             ref_hash_sketch[sketch[j]].push_back(i);
+            ref_hash_sketch_kmers[sketch[j]].push_back(sketch_kmers[j]);
             pthread_mutex_unlock(&sketchize_mutex[sketch[j]]);
         }
-    }
+    } while (++j < SKETCH_SIZE);
 
     // Release memory
     delete[] sketch;
+    delete[] sketch_kmers;
+
     if (i % 1000 == 0)
         logger->debug("loading reference in chunk size 2^%d: %d records", log_chunk, i);
     return 0;
@@ -310,15 +365,16 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
                                                 gap_length, LOG_MAX_BASENUMBER, log_chunk);
     add_time();
 
-    if (read_index) {
+    if (false && read_index) {  // This part is not complete so skip it
         try {
+            // TODO: read ref_hash_sketchs_kmers too
             ref_hash_sketchs[chunk_i] = read_vectors_from_file(index_file_name.c_str());
             logger->info("chunk %d read completed", chunk_i);
         } catch (...) {
             read_index = false;
         }
     }
-    if (!read_index) {
+    else {
         if (ref_genome.empty()) {
             // Load reference from file
             ref_genome = read_sequences_from_file(ref_file_name, FASTA);
@@ -329,6 +385,7 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
         // for chunk_i, create a array of vectors, each vector containing the tags id with that
         // hash number.
         vector<int> *ref_hash_sketch = ref_hash_sketchs[chunk_i] = new vector<int>[BIG_PRIME_NUMBER + 2];
+        vector<char*> *ref_hash_sketch_kmer = ref_hash_sketchs_kmers[chunk_i] = new vector<char*>[BIG_PRIME_NUMBER];
 
         logger->debugl2("before chunkenize");
         // Create chunks
@@ -353,6 +410,7 @@ auto make_ref_sketch(const char *const ref_file_name, const BasketMinHash &simil
     add_time();
 
     // Write the index to file if needed
+    // TODO: Write ref_hash_sketchs_kmers too
     if (!read_index && write_index)
         write_to_file(index_file_name.c_str(), ref_hash_sketchs[chunk_i], BIG_PRIME_NUMBER + 2);
     add_time();

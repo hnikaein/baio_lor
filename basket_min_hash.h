@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <vector>
+#include <memory>
 #include "bio_utils/sequence.h"
 
 
@@ -13,10 +14,12 @@ class BasketMinHash {
 public:
     BasketMinHash(int sketch_window, hash_function_t hash_function, int max_hash_function);
 
-    int *get_sketch(const Sequence &sequence, unsigned int chunk_i, int gingle_length, int gingle_gap) const;
+    std::tuple<int *, char **>
+    get_sketch(const Sequence &sequence, unsigned int chunk_i, int gingle_length, int gingle_gap) const;
 
-    int *get_sketch(const char *seq_str, unsigned long seq_str_len, unsigned int chunk_i, int gingle_length,
-                    int gingle_gap) const;
+    std::tuple<int *, char **>
+    get_sketch(const char *seq_str, unsigned long seq_str_len, unsigned int chunk_i, int gingle_length,
+               int gingle_gap) const;
 
 private:
     int sketch_window, max_hash_function;
