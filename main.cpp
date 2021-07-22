@@ -327,8 +327,8 @@ int main(int argc, char *argv[]) {
     similarity_claz = new BasketMinHash(1, zigma_hash, BIG_PRIME_NUMBER);
     add_time();
 
-    for (unsigned int chunk_i = 0; chunk_i < CHUNK_SIZES_LEN; chunk_i++)
-        make_ref_sketch(ref_file_name, *similarity_claz, chunk_i, GINGLE_LENGTH, 0, write_index, read_index);
+//    for (unsigned int chunk_i = 0; chunk_i < CHUNK_SIZES_LEN; chunk_i++)
+//        make_ref_sketch(ref_file_name, *similarity_claz, chunk_i, GINGLE_LENGTH, 0, write_index, read_index);
     add_time();
 
     reads = read_sequences_from_file(reads_file_name);
@@ -337,11 +337,12 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < reads.size(); ++i)
         lor_results[i] = vector<int>();
-    int corrects = multiproc(threads_count, align_read, static_cast<int>(reads.size()));
-    add_time();
+//    int corrects = multiproc(threads_count, align_read, static_cast<int>(reads.size()));
+    add_time();int corrects = 0;
     logger->debug("total results:%d", tot_res);
     logger->info("correct reads for config(%s): %d\t\t\ttimes: %s", config, corrects, get_times_str(false));
-
+    lor_results[0] = vector<int>();
+    lor_results[0].push_back(1);
     run_aryana();
     delete[] (reads[0].get_name_c() - 1); // TODO error for pacbio
     add_time();
