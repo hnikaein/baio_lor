@@ -14,6 +14,7 @@
 #include "utils/multiproc.h"
 #include "aryana/main.h"
 #include "bio_utils/sequence.h"
+#include "aryana/const.h"
 
 using namespace std;
 
@@ -50,9 +51,9 @@ int run_aryana_for_ref(const int ref_num) {
         reads_string.append("@");
         reads_string.append(read->get_name_c());
         reads_string.append("\n");
-        reads_string.append(read->seq_str, 0, 40000);
+        reads_string.append(read->seq_str, 0, MAX_READ_LEN - 1000);
         reads_string.append("\n+\n");
-        reads_string.append(read->quality_str, 0, 40000);
+        reads_string.append(read->quality_str, 0, MAX_READ_LEN - 1000);
         reads_string.append("\n");
         if (read_num.second > 0)
             alternative_results.insert(read->get_name());
